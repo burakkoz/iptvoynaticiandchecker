@@ -884,25 +884,41 @@
       // Dosya seçildiğinde ek işlemler yapılabilir.
     }
 
-	function loadM3U() {
+	// vavooLoader.js
+
+	function loadVavoo() {
 	  var vavooBtn = document.querySelector('.vavoo-btn');
-	  var m3uUrlVal = document.getElementById('m3uUrl').value.trim();
-	  var vavooUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
+	  vavooBtn.style.background = "red";
+	  // Hedef (orijinal) Vavoo URL'si
+	  var targetUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
+	  // Cloudflare Worker proxy URL'si
+	  var corsProxy = "https://burakkoz.burak-kozakbas.workers.dev/?url=";
+	  // Proxylü URL
+	  var finalUrl = corsProxy + targetUrl;
 	  
-	  if (m3uUrlVal !== vavooUrl) {
-		vavooBtn.style.background = "";
-	  }
+	  var m3uUrlInput = document.getElementById('m3uUrl');
+	  // Proxylü URL'yi data attribute'da saklıyoruz
+	  m3uUrlInput.dataset.fullurl = finalUrl;
+	  // Kullanıcıya gösterilen kısımda sadece orijinal URL gözüküyor
+	  m3uUrlInput.value = targetUrl;
 	  
-	  const url = m3uUrlVal;
-	  const fileInput = document.getElementById('m3uFile');
-	  const file = fileInput.files[0];
+	  // M3U dosyası yüklemesini başlatıyoruz
+	  loadM3U();
+	}
+
+	function loadM3U() {
+	  var m3uUrlInput = document.getElementById('m3uUrl');
+	  // Eğer data attribute'da proxylü URL varsa onu kullan; yoksa input değerini kullan.
+	  var urlToFetch = m3uUrlInput.dataset.fullurl || m3uUrlInput.value.trim();
+	  var fileInput = document.getElementById('m3uFile');
+	  var file = fileInput.files[0];
 	  
-	  if (url && !file) {
-		axios.get(url, { responseType: 'blob' })
-		  .then(response => {
-			const reader = new FileReader();
+	  if (urlToFetch && !file) {
+		axios.get(urlToFetch, { responseType: 'blob' })
+		  .then(function(response) {
+			var reader = new FileReader();
 			reader.onload = function(e) {
-			  const data = e.target.result;
+			  var data = e.target.result;
 			  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
 				alert("Geçerli bir M3U dosyası değil!");
 				return;
@@ -911,14 +927,14 @@
 			};
 			reader.readAsText(response.data);
 		  })
-		  .catch(error => {
+		  .catch(function(error) {
 			console.error(error);
 			alert('M3U dosyası yüklenirken hata oluştu!');
 		  });
 	  } else if (file) {
-		const reader = new FileReader();
+		var reader = new FileReader();
 		reader.onload = function(e) {
-		  const data = e.target.result;
+		  var data = e.target.result;
 		  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
 			alert("Geçerli bir M3U dosyası değil!");
 			return;
@@ -931,12 +947,8 @@
 	  }
 	}
 
-	function loadVavoo() {
-	  var vavooBtn = document.querySelector('.vavoo-btn');
-	  vavooBtn.style.background = "red";
-	  document.getElementById('m3uUrl').value = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
-	  loadM3U();
-	}
+
+
 
     function parseM3U(data) {
       const lines = data.split('\n').map(line => line.trim()).filter(line => line !== '');
