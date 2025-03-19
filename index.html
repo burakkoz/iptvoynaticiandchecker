@@ -885,125 +885,66 @@
       // Dosya seçildiğinde ek işlemler yapılabilir.
     }
 
+	// vavooLoader.js
+
 	function loadVavoo() {
-	  // Önce düğmeyi görsel geri bildirim için güncelle
 	  var vavooBtn = document.querySelector('.vavoo-btn');
-	  vavooBtn.style.background = "linear-gradient(45deg, #f59e0b, #d97706)";
-	  vavooBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yükleniyor';
+	  vavooBtn.style.background = "red";
+	  // Hedef (orijinal) Vavoo URL'si
+	  var targetUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
+	  // Cloudflare Worker proxy URL'si
+	  var corsProxy = "https://burakkoz.burak-kozakbas.workers.dev/?url=";
+	  // Proxylü URL
+	  var finalUrl = corsProxy + targetUrl;
 	  
-	  // Vavoo kanalları için proxy yöntemi
-	  const proxyUrl = "https://cors-anywhere.herokuapp.com/";
-	  const targetUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
+	  var m3uUrlInput = document.getElementById('m3uUrl');
+	  // Proxylü URL'yi data attribute'da saklıyoruz
+	  m3uUrlInput.dataset.fullurl = finalUrl;
+	  // Kullanıcıya gösterilen kısımda sadece orijinal URL gözüküyor
+	  m3uUrlInput.value = targetUrl;
 	  
-	  // Alternatif olarak kendi proxy'nizi de kullanabilirsiniz
-	  const corsProxies = [
-		"https://burakkoz.burak-kozakbas.workers.dev/?url=",
-		"https://corsproxy.io/?",
-		"https://cors-anywhere.herokuapp.com/"
-	  ];
-	  
-	  const selectedProxy = corsProxies[0]; // İlk proxy'yi kullan
-	  const finalUrl = selectedProxy + encodeURIComponent(targetUrl);
-	  
-	  fetch(finalUrl)
-		.then(response => {
-		  if (!response.ok) {
-			throw new Error('Network response was not ok');
-		  }
-		  return response.text();
-		})
-		.then(data => {
-		  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
-			throw new Error("Geçerli bir M3U içeriği alınamadı");
-		  }
-		  
-		  parseM3U(data);
-		  vavooBtn.style.background = "linear-gradient(45deg, #22c55e, #16a34a)";
-		  vavooBtn.innerHTML = '<i class="fas fa-check"></i> Vavoo';
-		  showToast("Vavoo kanalları başarıyla yüklendi", "success");
-		})
-		.catch(error => {
-		  console.error("Vavoo yükleme hatası:", error);
-		  vavooBtn.style.background = "linear-gradient(45deg, #ef4444, #dc2626)";
-		  vavooBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Vavoo';
-		  
-		  // Hata durumunda alternatif URL deneyebiliriz
-		  showToast("Vavoo yüklenemedi. Alternatif yöntem deneniyor...", "error");
-		  
-		  // Alternatif çözüm: Önceden alınmış vavoo içeriği
-		  fallbackVavooLoad();
-		});
+	  // M3U dosyası yüklemesini başlatıyoruz
+	  loadM3U();
 	}
 
-	function fallbackVavooLoad() {
-	  // Alternatif olarak GitHub veya başka bir static hosting'den 
-	  // hazır bir vavoo m3u dosyasını yükleyebilirsiniz
-	  const fallbackUrl = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/vavoo.m3u";
-	  
-	  fetch(fallbackUrl)
-		.then(response => response.text())
-		.then(data => {
-		  parseM3U(data);
-		  showToast("Alternatif Vavoo kanalları yüklendi", "success");
-		})
-		.catch(error => {
-		  console.error("Alternatif yükleme de başarısız:", error);
-		  showToast("Vavoo kanalları yüklenemedi. Lütfen başka bir kaynak deneyin.", "error");
-		});
-	}
-
-	// Mevcut loadM3U fonksiyonunu daha güvenilir hale getirelim
 	function loadM3U() {
 	  var m3uUrlInput = document.getElementById('m3uUrl');
-	  var urlToFetch = m3uUrlInput.value.trim();
+	  // Eğer data attribute'da proxylü URL varsa onu kullan; yoksa input değerini kullan.
+	  var urlToFetch = m3uUrlInput.dataset.fullurl || m3uUrlInput.value.trim();
 	  var fileInput = document.getElementById('m3uFile');
 	  var file = fileInput.files[0];
 	  
-	  // URL ile proxy gerektiren Vavoo kontrolü
-	  if (urlToFetch.includes("vavoo")) {
-		loadVavoo();
-		return;
-	  }
-	  
-	  // Normal M3U URL yükleme
 	  if (urlToFetch && !file) {
-		// Yükleme başladığını göster
-		showToast("M3U yükleniyor...", "info");
-		
-		fetch(urlToFetch)
-		  .then(response => {
-			if (!response.ok) {
-			  throw new Error(`HTTP error! Status: ${response.status}`);
-			}
-			return response.text();
+		axios.get(urlToFetch, { responseType: 'blob' })
+		  .then(function(response) {
+			var reader = new FileReader();
+			reader.onload = function(e) {
+			  var data = e.target.result;
+			  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
+				alert("Geçerli bir M3U dosyası değil!");
+				return;
+			  }
+			  parseM3U(data);
+			};
+			reader.readAsText(response.data);
 		  })
-		  .then(data => {
-			if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
-			  showToast("Geçerli bir M3U dosyası değil!", "error");
-			  return;
-			}
-			parseM3U(data);
-			showToast("M3U başarıyla yüklendi", "success");
-		  })
-		  .catch(error => {
-			console.error("M3U yükleme hatası:", error);
-			showToast("M3U yüklenirken hata oluştu: " + error.message, "error");
+		  .catch(function(error) {
+			console.error(error);
+			alert('M3U dosyası yüklenirken hata oluştu!');
 		  });
 	  } else if (file) {
-		// Dosya yükleme
 		var reader = new FileReader();
 		reader.onload = function(e) {
 		  var data = e.target.result;
 		  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
-			showToast("Geçerli bir M3U dosyası değil!", "error");
+			alert("Geçerli bir M3U dosyası değil!");
 			return;
 		  }
 		  parseM3U(data);
-		  showToast("M3U dosyası başarıyla yüklendi", "success");
 		};
 		reader.readAsText(file);
 	  } else {
-		showToast("Lütfen geçerli bir URL girin veya dosya seçin!", "error");
+		alert("Lütfen geçerli bir URL girin veya dosya seçin!");
 	  }
 	}
 
