@@ -806,38 +806,30 @@
       channelListDiv.appendChild(fragment);
     }
 
-	function playChannel(url, name = "") {
-	  // Eğer URL vavoo kanalı ise proxy ekle
-	  if (url.includes("vavoo.to")) {
-		const proxy = "https://burakkoz.burak-kozakbas.workers.dev/?url=";
-		// URL'yi encode ederek proxy üzerinden yönlendiriyoruz
-		url = proxy + encodeURIComponent(url);
-	  }
-	  
-	  const videoPlayer = document.getElementById('videoPlayer');
-	  if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
-		videoPlayer.src = url;
-		videoPlayer.load();
-		videoPlayer.play();
-	  } else if (Hls.isSupported()) {
-		if (window.hls) {
-		  window.hls.destroy();
-		}
-		window.hls = new Hls();
-		window.hls.loadSource(url);
-		window.hls.attachMedia(videoPlayer);
-		window.hls.on(Hls.Events.MANIFEST_PARSED, function () {
-		  videoPlayer.play();
-		});
-	  } else {
-		videoPlayer.src = url;
-		videoPlayer.load();
-		videoPlayer.play();
-	  }
-	  document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
-	  document.getElementById("currentLink").value = url;
-	}
-
+    function playChannel(url, name = "") {
+      const videoPlayer = document.getElementById('videoPlayer');
+      if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
+        videoPlayer.src = url;
+        videoPlayer.load();
+        videoPlayer.play();
+      } else if (Hls.isSupported()) {
+        if (window.hls) {
+          window.hls.destroy();
+        }
+        window.hls = new Hls();
+        window.hls.loadSource(url);
+        window.hls.attachMedia(videoPlayer);
+        window.hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          videoPlayer.play();
+        });
+      } else {
+        videoPlayer.src = url;
+        videoPlayer.load();
+        videoPlayer.play();
+      }
+      document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
+      document.getElementById("currentLink").value = url;
+    }
 
     function transformUrl(url) {
       try {
