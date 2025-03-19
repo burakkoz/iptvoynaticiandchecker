@@ -806,30 +806,73 @@
       channelListDiv.appendChild(fragment);
     }
 
-    function playChannel(url, name = "") {
-      const videoPlayer = document.getElementById('videoPlayer');
-      if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
-        videoPlayer.src = url;
-        videoPlayer.load();
-        videoPlayer.play();
-      } else if (Hls.isSupported()) {
-        if (window.hls) {
-          window.hls.destroy();
-        }
-        window.hls = new Hls();
-        window.hls.loadSource(url);
-        window.hls.attachMedia(videoPlayer);
-        window.hls.on(Hls.Events.MANIFEST_PARSED, function () {
-          videoPlayer.play();
-        });
-      } else {
-        videoPlayer.src = url;
-        videoPlayer.load();
-        videoPlayer.play();
-      }
-      document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
-      document.getElementById("currentLink").value = url;
-    }
+	function playChannel(url, name = "") {
+	  const videoPlayer = document.getElementById('videoPlayer');
+	  document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
+	  document.getElementById("currentLink").value = url;
+	  
+	  if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
+		videoPlayer.src = url;
+		videoPlayer.load();
+		videoPlayer.play();
+	  } else if (Hls.isSupported()) {
+		if (window.hls) {
+		  window.hls.destroy();
+		}
+		
+		const hls = new Hls({
+		  xhrSetup: function(xhr, url) {
+			// CORS ve güvenlik ayarlarını yapılandırma
+			xhr.withCredentials = false; // CORS isteği için önemli
+			// Debug için
+			console.log("HLS isteği yapılıyor:", url);
+		  },
+		  // Hata ayıklama ve yeniden deneme ayarları
+		  debug: true,
+		  manifestLoadingTimeOut: 15000,
+		  manifestLoadingMaxRetry: 5,
+		  levelLoadingTimeOut: 15000,
+		  levelLoadingMaxRetry: 5,
+		  fragLoadingTimeOut: 20000,
+		  fragLoadingMaxRetry: 5
+		});
+		
+		window.hls = hls;
+		hls.loadSource(url);
+		hls.attachMedia(videoPlayer);
+		hls.on(Hls.Events.MANIFEST_PARSED, function () {
+		  videoPlayer.play().catch(err => {
+			console.error("Oynatma hatası:", err);
+			showToast("Oynatma başlatılamadı: " + err.message, "error");
+		  });
+		});
+		
+		// Hata yakalama
+		hls.on(Hls.Events.ERROR, function (event, data) {
+		  console.error("HLS Hatası:", data);
+		  if (data.fatal) {
+			switch(data.type) {
+			  case Hls.ErrorTypes.NETWORK_ERROR:
+				console.log("Ağ hatası, yeniden deneniyor...");
+				hls.startLoad();
+				break;
+			  case Hls.ErrorTypes.MEDIA_ERROR:
+				console.log("Medya hatası, kurtarılmaya çalışılıyor...");
+				hls.recoverMediaError();
+				break;
+			  default:
+				console.error("Kurtarılamaz hata, yükleme durduruldu");
+				hls.destroy();
+				break;
+			}
+		  }
+		});
+	  } else {
+		videoPlayer.src = url;
+		videoPlayer.load();
+		videoPlayer.play();
+	  }
+	}
 
     function transformUrl(url) {
       try {
@@ -885,70 +928,148 @@
       // Dosya seçildiğinde ek işlemler yapılabilir.
     }
 
-	// vavooLoader.js
-
 	function loadVavoo() {
 	  var vavooBtn = document.querySelector('.vavoo-btn');
 	  vavooBtn.style.background = "red";
-	  // Hedef (orijinal) Vavoo URL'si
-	  var targetUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
-	  // Cloudflare Worker proxy URL'si
-	  var corsProxy = "https://burakkoz.burak-kozakbas.workers.dev/?url=";
-	  // Proxylü URL
-	  var finalUrl = corsProxy + targetUrl;
+	  
+	  // Dinamik proxy URL oluşturma - GitHub Pages için uyumlu
+	  const corsProxyUrl = "https://burakkoz.burak-kozakbas.workers.dev/";
+	  const targetUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
+	  
+	  // User-Agent parametresi ekleyelim
+	  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+	  const finalUrl = `${corsProxyUrl}?url=${encodeURIComponent(targetUrl)}&ua=${encodeURIComponent(userAgent)}`;
 	  
 	  var m3uUrlInput = document.getElementById('m3uUrl');
-	  // Proxylü URL'yi data attribute'da saklıyoruz
 	  m3uUrlInput.dataset.fullurl = finalUrl;
-	  // Kullanıcıya gösterilen kısımda sadece orijinal URL gözüküyor
 	  m3uUrlInput.value = targetUrl;
 	  
-	  // M3U dosyası yüklemesini başlatıyoruz
+	  showToast("Vavoo yayınları yükleniyor...", "info");
 	  loadM3U();
 	}
 
 	function loadM3U() {
 	  var m3uUrlInput = document.getElementById('m3uUrl');
-	  // Eğer data attribute'da proxylü URL varsa onu kullan; yoksa input değerini kullan.
 	  var urlToFetch = m3uUrlInput.dataset.fullurl || m3uUrlInput.value.trim();
 	  var fileInput = document.getElementById('m3uFile');
 	  var file = fileInput.files[0];
 	  
 	  if (urlToFetch && !file) {
-		axios.get(urlToFetch, { responseType: 'blob' })
-		  .then(function(response) {
-			var reader = new FileReader();
-			reader.onload = function(e) {
-			  var data = e.target.result;
-			  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
-				alert("Geçerli bir M3U dosyası değil!");
-				return;
-			  }
-			  parseM3U(data);
-			};
-			reader.readAsText(response.data);
+		showToast("M3U dosyası yükleniyor...", "info");
+		
+		// Fetch API ile hata yakalama geliştirmeleri
+		fetch(urlToFetch)
+		  .then(response => {
+			if (!response.ok) {
+			  throw new Error(`HTTP hata! Durum: ${response.status}`);
+			}
+			return response.text();
 		  })
-		  .catch(function(error) {
-			console.error(error);
-			alert('M3U dosyası yüklenirken hata oluştu!');
+		  .then(data => {
+			console.log("M3U verisi alındı, uzunluk:", data.length);
+			if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
+			  throw new Error("Geçerli bir M3U dosyası değil!");
+			}
+			parseM3U(data);
+			showToast("M3U listesi başarıyla yüklendi", "success");
+		  })
+		  .catch(error => {
+			console.error("M3U yükleme hatası:", error);
+			showToast(`M3U yükleme hatası: ${error.message}`, "error");
 		  });
 	  } else if (file) {
+		// Dosya yükleme kodu (mevcut kod yeterli)
 		var reader = new FileReader();
 		reader.onload = function(e) {
 		  var data = e.target.result;
 		  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
-			alert("Geçerli bir M3U dosyası değil!");
+			showToast("Geçerli bir M3U dosyası değil!", "error");
 			return;
 		  }
 		  parseM3U(data);
 		};
 		reader.readAsText(file);
 	  } else {
-		alert("Lütfen geçerli bir URL girin veya dosya seçin!");
+		showToast("Lütfen geçerli bir URL girin veya dosya seçin!", "error");
 	  }
 	}
 
+	// HTML içinde bir debug paneli ekleyin
+	function addDebugPanel() {
+	  const debugPanel = document.createElement('div');
+	  debugPanel.id = 'debugPanel';
+	  debugPanel.style.cssText = `
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		max-height: 200px;
+		overflow-y: auto;
+		background: rgba(0,0,0,0.8);
+		color: #00ff00;
+		font-family: monospace;
+		font-size: 12px;
+		z-index: 10000;
+		padding: 10px;
+		display: none;
+	  `;
+	  
+	  const toggleButton = document.createElement('button');
+	  toggleButton.textContent = 'Debug';
+	  toggleButton.style.cssText = `
+		position: fixed;
+		bottom: 10px;
+		right: 10px;
+		z-index: 10001;
+		padding: 5px 10px;
+		background: #333;
+		color: #fff;
+		border: none;
+		border-radius: 5px;
+	  `;
+	  
+	  toggleButton.addEventListener('click', () => {
+		const panel = document.getElementById('debugPanel');
+		panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+	  });
+	  
+	  document.body.appendChild(debugPanel);
+	  document.body.appendChild(toggleButton);
+	  
+	  // Console.log override
+	  const originalConsoleLog = console.log;
+	  const originalConsoleError = console.error;
+	  const originalConsoleWarn = console.warn;
+	  
+	  console.log = function() {
+		originalConsoleLog.apply(console, arguments);
+		logToPanel('LOG', arguments);
+	  };
+	  
+	  console.error = function() {
+		originalConsoleError.apply(console, arguments);
+		logToPanel('ERROR', arguments);
+	  };
+	  
+	  console.warn = function() {
+		originalConsoleWarn.apply(console, arguments);
+		logToPanel('WARN', arguments);
+	  };
+	  
+	  function logToPanel(type, args) {
+		const panel = document.getElementById('debugPanel');
+		const entry = document.createElement('div');
+		const timestamp = new Date().toISOString().substr(11, 8);
+		
+		entry.innerHTML = `<span style="color:${type === 'ERROR' ? 'red' : type === 'WARN' ? 'orange' : '#00ff00'}">[${timestamp}][${type}]</span> ${Array.from(args).map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ')}`;
+		
+		panel.appendChild(entry);
+		panel.scrollTop = panel.scrollHeight;
+	  }
+	}
 
+	// Sayfa yüklendiğinde debug panelini ekle
+	document.addEventListener('DOMContentLoaded', addDebugPanel);
 
 
     function parseM3U(data) {
