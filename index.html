@@ -884,6 +884,27 @@
     function handleFileSelect() {
       // Dosya seçildiğinde ek işlemler yapılabilir.
     }
+	
+	function fetchWithUserAgent(url) {
+		return fetch(url, {
+			headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" }
+		});
+	}
+
+	function playChannel(url) {
+		url = transformUrl(url); // Proxy ekleyerek URL’yi düzenliyoruz
+
+		fetchWithUserAgent(url)
+			.then(response => response.text())
+			.then(data => {
+				console.log("Başarılı:", data);
+				document.getElementById("videoPlayer").src = url;
+			})
+			.catch(error => {
+				console.error("Hata:", error);
+			});
+	}
+
 
 	// vavooLoader.js
 
