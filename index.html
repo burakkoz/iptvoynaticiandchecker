@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IPTV Kontrol Paneli - Düzenlenmiş Layout</title>
+  <!-- Gerekli Kütüphaneler -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #6366f1;
+      --secondary: #8b5cf6;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --bg-dark: #0f172a;
+      --bg-light: #1e293b;
+      --glass: rgba(255, 255, 255, 0.08);
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, var(--bg-dark) 0%, var(--bg-light) 100%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 1.5rem;
+      line-height: 1.6;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+    .glass-panel {
+      background: var(--glass);
+      backdrop-filter: blur(20px) saturate(180%);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 1.25rem;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+      padding: 2rem;
+      margin: 0 auto;
+      max-width: 1400px;
+    }
+    .video-player-section {
+      background: #000;
+      border-radius: 1rem;
+      overflow: hidden;
+    }
+    .gradient-btn {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      border: none;
+      padding: 0.75rem 1.75rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      touch-action: manipulation;
+      color: var(--text-primary);
+    }
+    .gradient-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(99,102,241,0.35);
+    }
+    .gradient-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(45deg, transparent 0%, rgba(255,255,255,0.12) 100%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .gradient-btn:hover::after {
+      opacity: 1;
+    }
+    .modern-table {
+      --bs-table-bg: transparent;
+      --bs-table-border-color: rgba(255,255,255,0.1);
+      border-radius: 1rem;
+      overflow: hidden;
+      margin: 1.5rem 0;
+    }
+    .modern-table th {
+      background: rgba(30, 41, 59, 0.95);
+      color: var(--primary) !important;
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      border-bottom: 2px solid var(--primary) !important;
+      padding: 1.25rem;
+    }
+    .modern-table td {
+      background: rgba(255,255,255,0.03) !important;
+      color: var(--text-primary) !important;
+      font-weight: 500;
+      padding: 1rem 1.25rem;
+      vertical-align: middle;
+      border-color: rgba(255,255,255,0.07) !important;
+    }
+    .modern-table tr:hover td {
+      background: rgba(255,255,255,0.05) !important;
+    }
+    .input-field {
+      background: rgba(255,255,255,0.07) !important;
+      border: 1px solid rgba(255,255,255,0.15) !important;
+      border-radius: 0.75rem;
+      color: var(--text-primary) !important;
+      font-weight: 500;
+      padding: 1rem 1.25rem !important;
+      transition: all 0.3s ease;
+    }
+    .input-field:focus {
+      border-color: var(--primary) !important;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.3) !important;
+    }
+    .status-badge {
+      padding: 0.4rem 0.9rem;
+      border-radius: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      backdrop-filter: blur(8px);
+    }
+    .active-badge {
+      background: rgba(34,197,94,0.15);
+      color: var(--success);
+    }
+    .expired-badge {
+      background: rgba(239,68,68,0.15);
+      color: var(--danger);
+    }
+    .toast-modern {
+      background: rgba(30,41,59,0.98) !important;
+      border: 1px solid rgba(255,255,255,0.15) !important;
+      border-radius: 0.75rem !important;
+      backdrop-filter: blur(12px);
+    }
+    .copy-btn {
+      transition: all 0.3s ease;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      touch-action: manipulation;
+    }
+    .copy-btn:hover {
+      background: rgba(99,102,241,0.1) !important;
+      transform: scale(1.05);
+    }
+    #startIndex {
+      max-width: 200px;
+    }
+	#channelList {
+	  background: rgba(255, 255, 255, 0.1);
+	  border-radius: 1rem;
+	  border: 1px solid rgba(255, 255, 255, 0.2);
+	  padding: 1rem;
+	  max-height: 350px;
+	  overflow-y: auto;
+	  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+	}
+	.group-header {
+	  background: rgba(255, 255, 255, 0.1);
+	  color: #000;
+	  padding: 0.75rem 1.25rem;
+	  font-weight: 900;
+	  cursor: pointer;
+	  border-radius: 0.75rem;
+	  margin-bottom: 0.5rem;
+	}
+	.group-header:hover {
+	  background-color: rgba(99, 102, 241, 0.3);
+	}
+    .group-content {
+      display: none;
+    }
+	.channel-item {
+	  background: rgba(255, 255, 255, 0.05);
+	  color: var(--text-primary);
+	  font-size: 1rem;
+	  padding: 0.75rem 1.25rem;
+	  border-radius: 0.75rem;
+	  margin-bottom: 0.5rem;
+	  cursor: pointer;
+	  transition: background-color 0.3s ease, transform 0.3s ease;
+	}
+	.channel-item:hover {
+	  background: rgba(99, 102, 241, 0.2);
+	}
+
+    #currentChannel {
+      margin-top: 0.5rem;
+      font-weight: bold;
+      text-align: center;
+    }
+    #currentLink {
+      margin-top: 0.25rem;
+      font-size: 0.9rem;
+      text-align: center;
+      word-wrap: break-word;
+    }
+    @media (max-width: 768px) {
+      body {
+        padding: 1rem;
+      }
+      .glass-panel {
+        padding: 1.5rem;
+        border-radius: 1rem;
+      }
+      .gradient-btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+      }
+      #startIndex {
+        max-width: 100%;
+      }
+    }
+    @media (max-width: 576px) {
+      .glass-panel {
+        padding: 1rem;
+      }
+      .gradient-btn {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+      }
+      .toast-container {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+      }
+    }
+    .toast-container {
+      position: fixed;
+      bottom: 1rem;
+      right: 1rem;
+    }
+	.channel-item.active {
+	  background-color: rgba(99, 102, 241, 0.4);
+	  color: white;
+	}
+	.vavoo-btn {
+	  font-size: 1.2rem;
+	  padding: 0.3rem 0.6rem;
+	  border-radius: 0.4rem;
+	}
+	.kanal-btn {
+	  font-size: 1.1rem;
+	  padding: 0.3rem 0.6rem;
+	  border-radius: 0.4rem;
+	}
+	.channel-row:focus {
+	  outline: 2px solid var(--primary);
+	  background-color: rgba(99, 102, 241, 0.2);
+	}
+  </style>
+</head>
+<body>
+  <div class="glass-panel">
+    <!-- Başlık -->
+    <div class="text-center mb-5">
+      <h1 class="display-5 fw-bold mb-3" style="color: var(--primary);">
+        📺 IPTV Oynatıcı ve Kontrol
+      </h1>
+      <p class="lead" style="color: var(--text-secondary);">Profesyonel IPTV Bağlantı Yönetim Paneli</p>
+    </div>
+    <!-- IPTV Kanal Oynatıcı Bölümü -->
+    <div class="row mb-4">
+      <!-- Sol: Video Oynatıcı -->
+      <div class="col-md-8">
+        <div class="video-player-section">
+          <video id="videoPlayer" controls style="width: 100%; max-height: 400px; background: black;">
+            Tarayıcınız video etiketini desteklemiyor.
+          </video>
+        </div>
+        <div id="currentChannel">Şu anda oynatılan kanal: Yok</div>
+		<div class="input-group mb-3">
+		  <span class="input-group-text">Link</span>
+		  <input type="text" id="currentLink" class="form-control" placeholder="Kanal linki buraya yüklenecek">
+		  <button class="btn btn-primary" id="applyLinkBtn" type="button">Uygula</button>
+		</div>
+      </div>
+      <!-- Sağ: M3U URL Girişi, Kanal Listesi ve Arama -->
+      <div class="col-md-4">
+		<div class="mb-3 d-flex align-items-center gap-2">
+		  <input 
+			type="text" 
+			id="m3uUrl" 
+			class="form-control input-field" 
+			value="https://raw.githubusercontent.com/GitLatte/patr0n/refs/heads/site/lists/iptvsevenler.m3u"
+		  >
+		  <label class="btn gradient-btn" style="padding: 6px 12px;">
+			Dosya Seç
+			<input 
+			  type="file" 
+			  id="m3uFile" 
+			  accept=".m3u" 
+			  style="display: none;" 
+			  onchange="handleFileSelect()"
+			>
+		  </label>
+		</div>
+		<div class="mb-3 d-flex align-items-center gap-2">
+		  <button class="btn gradient-btn kanal-btn" onclick="loadM3U()">Kanalları Yükle</button>
+		  <button class="btn gradient-btn vavoo-btn" onclick="loadVavoo()">Vavoo</button>
+		  <input type="text" id="channelSearch" class="form-control" style="max-width: 180px;" placeholder="Kanal Ara">
+		</div>
+        <!-- Kanal listesi -->
+        <div id="channelList" class="list-group flex-grow-1"></div>
+      </div>
+    </div>
+    <!-- Mevcut Bağlantı Listesi -->
+    <div class="mb-4">
+      <label class="form-label mb-3" style="color: var(--text-primary); font-weight: 600;">Bağlantı Listesi</label>
+	<textarea 
+	  id="contenido"
+	  class="form-control input-field"
+	  rows="6"
+	  placeholder="Örnek: http://48.magnm.win:8080/live/P8HTV54/rt9oonpZro/136594.m3u8"
+	  style="resize: none;"
+	>https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/fullLink.txt</textarea>
+
+    </div>
+    <!-- Kontrol butonları ve başlangıç indeksi girişi -->
+    <div class="d-flex flex-wrap justify-content-between gap-3 mb-5">
+      <div class="d-flex flex-wrap gap-3">
+        <button class="btn gradient-btn" style="background: linear-gradient(45deg, #ef4444, #dc2626);" onclick="remove()">
+          <i class="fas fa-eraser me-2"></i>Temizle
+        </button>
+        <button id="downloadBtn" class="btn gradient-btn" style="background: linear-gradient(45deg, #3b82f6, #2563eb);" onclick="downloadTXT()" disabled>
+          <i class="fas fa-download me-2"></i>İndir
+        </button>
+      </div>
+      <div class="d-flex flex-wrap gap-3">
+        <input type="number" id="startIndex" class="form-control" placeholder="Başlangıç indeksi (ör: 500)" min="1">
+        <button class="btn gradient-btn" style="background: linear-gradient(45deg, #22c55e, #16a34a);" onclick="startScan()">
+          <i class="fas fa-play me-2"></i>Kontrol Et
+        </button>
+        <button id="toggleScanBtn" class="btn gradient-btn" style="background: linear-gradient(45deg, #f59e0b, #d97706);" onclick="toggleScan()">
+          Durdur
+        </button>
+      </div>
+    </div>
+    <div id="progressSection" class="d-none mb-4">
+      <div class="d-flex justify-content-between mb-3">
+        <span id="indicator" style="color: var(--text-primary); font-weight: 500;">İşlem Başlatılıyor...</span>
+        <span id="progressText" style="color: var(--primary); font-weight: 600;">0%</span>
+      </div>
+      <div class="progress" style="height: 10px; border-radius: 5px; background: rgba(255,255,255,0.1);">
+        <div id="progressBar" class="progress-bar progress-bar-striped bg-primary" 
+             style="width: 0%; transition: width 0.4s ease;">
+        </div>
+      </div>
+    </div>
+    <div class="table-responsive rounded-3" style="border: 1px solid rgba(255,255,255,0.1);">
+      <table class="table modern-table table-hover align-middle" id="sortTable">
+        <thead>
+          <tr>
+            <th>Sunucu</th>
+            <th>Kullanıcı</th>
+            <th>Son Kullanma</th>
+            <th>Durum</th>
+            <th>İçerikler</th>
+            <th>İşlem</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+  <!-- Toast Bildirim -->
+  <div class="toast-container">
+    <div id="liveToast" class="toast toast-modern" role="alert" aria-live="assertive" aria-atomic="true">
+      <div class="toast-body d-flex align-items-center gap-3">
+        <i class="fas"></i>
+        <div>
+          <span id="toastMessage" style="color: var(--text-primary);"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Kütüphaneler -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <!-- HLS.js desteği -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    // Debounce fonksiyonu: Belirli süre sonra işlevi çalıştırır.
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      }
+    }
+
+    let workingUrls = [];
+    let urlList = [];
+    let scanningInProgress = false;
+    let currentIndex = 0;
+    let totalUrls = 0;
+    let initialized = false;
+    let completedCount = 0;
+    let cancelTokens = [];
+    const requestTimeout = 10000;
+    const responseCache = {};
+    let tableInstance = null;
+    // Global kanal listesi (arama için)
+    let allChannels = [];
+
+    function updateDownloadButton() {
+      $('#downloadBtn').html(`<i class="fas fa-download me-2"></i>İndir (${workingUrls.length})`);
+    }
+
+    function processUrl(url) {
+      try {
+        const cleanedUrl = url.startsWith('http') ? url : `http://${url}`;
+        const urlObj = new URL(cleanedUrl);
+        const port = urlObj.port || (urlObj.protocol === 'https:' ? 443 : 80);
+        return {
+          apiUrl: `${urlObj.protocol}//${urlObj.hostname}:${port}/player_api.php`,
+          urlData: {
+            username: urlObj.searchParams.get('username'),
+            password: urlObj.searchParams.get('password'),
+            fullUrl: `${urlObj.protocol}//${urlObj.hostname}:${port}?username=${urlObj.searchParams.get('username')}&password=${urlObj.searchParams.get('password')}&type=m3u_plus`
+          }
+        };
+      } catch (error) {
+        throw new Error('Geçersiz URL formatı!');
+      }
+    }
+
+    function addRowToTable(rowHtml) {
+      if (tableInstance) {
+        tableInstance.row.add($(rowHtml)).draw(false);
+      } else {
+        $('tbody').append(rowHtml);
+      }
+    }
+
+    function renderRow(url, info, categories) {
+      const expirationDate = new Date(info.user_info.exp_date * 1000).toLocaleDateString('tr-TR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      const statusBadge = info.user_info.status === 'Active'
+        ? `<span class="status-badge active-badge"><i class="fas fa-check-circle"></i> Aktif</span>`
+        : `<span class="status-badge expired-badge"><i class="fas fa-times-circle"></i> Pasif</span>`;
+
+      const rowHtml = `
+        <tr tabindex="0" class="channel-row" data-url="${url}">
+          <td>${info.server_info.url}:${info.server_info.port}</td>
+          <td>${info.user_info.username}</td>
+          <td>
+            <div class="d-flex flex-column">
+              <span>${expirationDate}</span>
+              ${statusBadge}
+            </div>
+          </td>
+          <td>
+            <div class="d-flex gap-2">
+              <span class="badge bg-primary">Maks: ${info.user_info.max_connections}</span>
+              <span class="badge bg-success">Boş: ${info.user_info.max_connections - info.user_info.active_cons}</span>
+            </div>
+          </td>
+          <td>
+            ${categories.slice(0,3).map(c => `<span class="badge bg-secondary me-1">${c.category_name}</span>`).join('')}
+            ${categories.length > 3 ? '<span class="text-muted">...</span>' : ''}
+          </td>
+          <td>
+            <button class="btn btn-sm btn-outline-info table-play-btn" data-url="${url}" title="M3U URL Güncelle">
+              <i class="fas fa-play"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-primary copy-btn" data-url="${url}" title="Kopyala">
+              <i class="fas fa-copy"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-success download-btn" data-url="${url}" title="M3U İndir">
+              <i class="fas fa-download"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+      addRowToTable(rowHtml);
+    }
+
+    $.fn.dataTable.ext.type.order['max-connections-pre'] = function(data) {
+      let match = data.replace(/<[^>]*>?/gm, '').match(/\d+/);
+      return match ? parseInt(match[0], 10) : 0;
+    };
+
+    function initDataTable() {
+      tableInstance = $('#sortTable').DataTable({
+        language: {
+          "decimal": "",
+          "emptyTable": "Tabloda veri yok",
+          "info": "_TOTAL_ kayıttan _START_ - _END_ arası gösteriliyor",
+          "infoEmpty": "0 kayıttan 0 - 0 arası gösteriliyor",
+          "infoFiltered": "(_MAX_ kayıt içinden filtrelendi)",
+          "paginate": {
+            "first": "İlk",
+            "last": "Son",
+            "next": "Sonraki",
+            "previous": "Önceki"
+          },
+          "search": "Ara:"
+        },
+        order: [],
+        columnDefs: [
+          { targets: 3, type: "max-connections", orderable: true }
+        ]
+      });
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = $('#liveToast');
+      const icon = toast.find('i');
+      icon.removeClass('fa-check-circle fa-times-circle fa-info-circle text-success text-danger text-info')
+         .addClass(type === 'success'
+           ? 'fa-check-circle text-success'
+           : type === 'error'
+           ? 'fa-times-circle text-danger'
+           : 'fa-info-circle text-info'
+         );
+      $('#toastMessage').text(message);
+      new bootstrap.Toast(toast[0]).show();
+    }
+
+    async function extractExtraUrls(urls) {
+      const promises = urls.map(async (url) => {
+        try {
+          const headResponse = await axios.head(url, { timeout: requestTimeout });
+          const contentType = headResponse.headers['content-type'] || '';
+          if (contentType.includes('text')) {
+            const response = await axios.get(url, { timeout: requestTimeout });
+            const text = response.data;
+            return text.match(/(https?:\/\/[^\s]+)/g) || [];
+          }
+        } catch (e) {
+          console.error("Dosya çekilirken hata oluştu:", url, e.message);
+        }
+        return [];
+      });
+      const results = await Promise.all(promises);
+      return results.flat();
+    }
+
+    async function processUrlTask(url) {
+      try {
+        if(responseCache[url]){
+          const { info, categories } = responseCache[url];
+          renderRow(url, info, categories);
+          workingUrls.push(url);
+          updateDownloadButton();
+          return;
+        }
+        const { apiUrl, urlData } = processUrl(url);
+        const sourceInfo = axios.CancelToken.source();
+        cancelTokens.push(sourceInfo);
+        const [infoResponse, catResponse] = await Promise.all([
+          axios.get(`${apiUrl}?username=${urlData.username}&password=${urlData.password}`, { timeout: requestTimeout, cancelToken: sourceInfo.token }),
+          axios.get(`${apiUrl}?username=${urlData.username}&password=${urlData.password}&action=get_live_categories`, { timeout: requestTimeout, cancelToken: sourceInfo.token })
+        ]);
+        const info = infoResponse.data;
+        const categories = catResponse.data;
+        responseCache[url] = { info, categories };
+        renderRow(url, info, categories);
+        workingUrls.push(url);
+        updateDownloadButton();
+      } catch (error) {
+        if (axios.isCancel(error)) {
+          console.warn('İstek iptal edildi:', url);
+        } else {
+          console.error('Hata:', error.message);
+          showToast(`Hata: ${url} işlenemedi!`, 'error');
+        }
+      }
+    }
+
+    async function processUrlsConcurrently() {
+      const defaultConcurrency = 5;
+      const concurrencyLimit = navigator.hardwareConcurrency || defaultConcurrency;
+      async function worker() {
+        while (currentIndex < totalUrls && scanningInProgress) {
+          const url = urlList[currentIndex++];
+          $('#indicator').text(`Tarama yapılıyor: ${url} (${currentIndex}/${totalUrls})`);
+          await processUrlTask(url);
+          completedCount++;
+          $('#progressBar').css('width', `${(completedCount/totalUrls)*100}%`);
+          $('#progressText').text(`${Math.round((completedCount/totalUrls)*100)}%`);
+        }
+      }
+      const workers = Array.from({ length: concurrencyLimit }, () => worker());
+      await Promise.all(workers);
+    }
+
+    async function startScan() {
+      if (!initialized) {
+        const content = $('#contenido').val();
+        urlList = content.match(/(https?:\/\/[^\s]+)/g) || [];
+        if (urlList.length === 0) {
+          showToast("Geçerli URL bulunamadı!", "error");
+          return;
+        }
+        const extraUrls = await extractExtraUrls(urlList);
+        urlList = [...new Set(urlList.concat(extraUrls))];
+        totalUrls = urlList.length;
+        let startIdx = parseInt($('#startIndex').val());
+        if (isNaN(startIdx) || startIdx < 1) {
+          currentIndex = 0;
+        } else {
+          currentIndex = startIdx - 1;
+          if (currentIndex >= totalUrls) {
+            showToast("Başlangıç indeksi URL sayısından fazla!", "error");
+            return;
+          }
+        }
+        workingUrls = [];
+        completedCount = currentIndex; 
+        if ($.fn.DataTable.isDataTable('#sortTable')) {
+          tableInstance.destroy();
+          tableInstance = null;
+        }
+        $('tbody').empty();
+        $('#progressSection').removeClass('d-none');
+        initialized = true;
+      }
+      scanningInProgress = true;
+      await processUrlsConcurrently();
+      if (currentIndex >= totalUrls) {
+        scanningInProgress = false;
+        $('#indicator').text("Tarama Bitti");
+        showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
+        if (!$.fn.DataTable.isDataTable('#sortTable')) {
+          initDataTable();
+        }
+        $('#downloadBtn').prop('disabled', workingUrls.length === 0);
+        $('#toggleScanBtn').text("Durdur");
+      }
+    }
+
+    function toggleScan() {
+      if (scanningInProgress) {
+        scanningInProgress = false;
+        cancelTokens.forEach(token => token.cancel());
+        cancelTokens = [];
+        $('#toggleScanBtn').text("Devam Ettir");
+        showToast("Tarama duraklatıldı.", "info");
+        $('#downloadBtn').prop('disabled', false);
+        if (!$.fn.DataTable.isDataTable('#sortTable')) {
+          initDataTable();
+        }
+      } else {
+        if (currentIndex >= totalUrls) {
+          showToast("Tarama zaten tamamlandı.", "info");
+          return;
+        }
+        scanningInProgress = true;
+        $('#toggleScanBtn').text("Durdur");
+        showToast("Tarama devam ediyor.", "info");
+        processUrlsConcurrently().then(() => {
+          if (currentIndex >= totalUrls) {
+            scanningInProgress = false;
+            $('#indicator').text("Tarama Bitti");
+            showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
+            if (!$.fn.DataTable.isDataTable('#sortTable')) {
+              initDataTable();
+            }
+            $('#downloadBtn').prop('disabled', workingUrls.length === 0);
+            $('#toggleScanBtn').text("Durdur");
+          }
+        });
+      }
+    }
+
+    function downloadTXT() {
+      if (workingUrls.length === 0) {
+        showToast('İndirilecek bağlantı bulunamadı!', 'error');
+        return;
+      }
+      const blob = new Blob([workingUrls.join('\n')], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `iptv_${new Date().toISOString().split('T')[0]}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function remove() {
+      $('#contenido').val('');
+      $('tbody').empty();
+      $('#progressSection').addClass('d-none');
+      $('#downloadBtn').prop('disabled', true);
+      workingUrls = [];
+      if ($.fn.DataTable.isDataTable('#sortTable')) {
+        tableInstance.destroy();
+        tableInstance = null;
+      }
+      updateDownloadButton();
+      showToast('Tüm veriler temizlendi!', 'info');
+      scanningInProgress = false;
+      initialized = false;
+      currentIndex = 0;
+      totalUrls = 0;
+      completedCount = 0;
+      for (let key in responseCache) {
+        delete responseCache[key];
+      }
+      cancelTokens = [];
+    }
+
+    $(document).on('click', '.copy-btn', function() {
+      const link = $(this).attr('data-url');
+      navigator.clipboard.writeText(link);
+      showToast('Bağlantı panoya kopyalandı!', 'success');
+    });
+
+    $(document).on('click', '.download-btn', function() {
+      const link = $(this).attr('data-url');
+      const urlObj = new URL(link);
+      const username = urlObj.searchParams.get('username') || 'download';
+      const filename = `tv_channels_${username}.m3u`;
+      const a = document.createElement('a');
+      a.href = link;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+
+    $(document).on('click', '.table-play-btn', function() {
+      const originalLink = $(this).attr('data-url');
+      try {
+        const urlObj = new URL(originalLink);
+        urlObj.searchParams.set('type', 'm3u_plus');
+        urlObj.searchParams.set('output', 'hls');
+        const newLink = urlObj.toString();
+        $('#m3uUrl').val(newLink);
+        showToast('M3U URL güncellendi ve kanal listesi yükleniyor...', 'success');
+        loadM3U(); 
+      } catch (error) {
+        console.error("Link işlenirken hata:", error);
+        showToast("Link işlenirken hata oluştu!", 'error');
+      }
+    });
+
+    // Debounce edilmiş kanal arama fonksiyonu
+    const debouncedChannelSearch = debounce(() => {
+      const query = document.getElementById("channelSearch").value.trim().toLowerCase();
+      const filtered = allChannels.filter(ch => ch.name.toLowerCase().includes(query));
+      renderChannelList(filtered);
+    }, 300);
+
+    document.getElementById("channelSearch").addEventListener("input", debouncedChannelSearch);
+
+    // DocumentFragment kullanarak optimize edilmiş renderChannelList fonksiyonu
+    function renderChannelList(channels) {
+      const grouped = {};
+      channels.forEach(ch => {
+        if (!grouped[ch.category]) {
+          grouped[ch.category] = [];
+        }
+        grouped[ch.category].push(ch);
+      });
+      const channelListDiv = document.getElementById('channelList');
+      channelListDiv.innerHTML = '';
+      const searchValue = document.getElementById("channelSearch").value.trim();
+      const fragment = document.createDocumentFragment();
+      for (let cat in grouped) {
+        const header = document.createElement('a');
+        header.className = 'list-group-item list-group-item-action group-header';
+        header.href = "#";
+        // Grup başlığına kanal sayısını ekledik.
+        header.textContent = `${cat} (${grouped[cat].length})`;
+        header.addEventListener('click', function(e) {
+          e.preventDefault();
+          if (searchValue === "") {
+            const contentDiv = this.nextElementSibling;
+            contentDiv.style.display = (contentDiv.style.display === 'block') ? 'none' : 'block';
+          }
+        });
+        fragment.appendChild(header);
+        const groupContent = document.createElement('div');
+        groupContent.className = 'group-content';
+        groupContent.style.display = (searchValue !== "") ? 'block' : 'none';
+        grouped[cat].forEach(ch => {
+          const channelItem = document.createElement('a');
+          channelItem.className = 'list-group-item list-group-item-action channel-item';
+          channelItem.href = "#";
+          channelItem.textContent = ch.name;
+          channelItem.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('.channel-item.active').forEach(el => el.classList.remove('active'));
+            this.classList.add('active');
+            const transformedUrl = transformUrl(ch.url);
+            playChannel(transformedUrl, ch.name);
+          });
+          groupContent.appendChild(channelItem);
+        });
+        fragment.appendChild(groupContent);
+      }
+      channelListDiv.appendChild(fragment);
+    }
+
+    function playChannel(url, name = "") {
+      const videoPlayer = document.getElementById('videoPlayer');
+      if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
+        videoPlayer.src = url;
+        videoPlayer.load();
+        videoPlayer.play();
+      } else if (Hls.isSupported()) {
+        if (window.hls) {
+          window.hls.destroy();
+        }
+        window.hls = new Hls();
+        window.hls.loadSource(url);
+        window.hls.attachMedia(videoPlayer);
+        window.hls.on(Hls.Events.MANIFEST_PARSED, function () {
+          videoPlayer.play();
+        });
+      } else {
+        videoPlayer.src = url;
+        videoPlayer.load();
+        videoPlayer.play();
+      }
+      document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
+      document.getElementById("currentLink").value = url;
+    }
+
+    function transformUrl(url) {
+      try {
+        const urlObj = new URL(url);
+        let path = urlObj.pathname;
+        if (path.endsWith('/')) {
+          path = path.slice(0, -1);
+        }
+        const segments = path.split('/');
+        const lastSegment = segments[segments.length - 1];
+        if (lastSegment.includes('.')) {
+          return url;
+        }
+        urlObj.pathname = '/live' + path + '.m3u8';
+        return urlObj.toString();
+      } catch (error) {
+        console.error("URL dönüşüm hatası:", error);
+        return url;
+      }
+    }
+
+    document.getElementById("applyLinkBtn").addEventListener("click", function() {
+      const editedUrl = document.getElementById("currentLink").value.trim();
+      if (editedUrl) {
+        playChannel(editedUrl);
+        showToast("Düzenlenen link ile oynatılıyor...", "success");
+      } else {
+        showToast("Lütfen geçerli bir link girin!", "error");
+      }
+    });
+
+    // Dosya yükleme işlemi – m3uUrl değerini dosya adından değiştirmiyoruz.
+    document.getElementById('m3uFile').addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (!file) {
+        alert('Lütfen bir M3U dosyası seçin!');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const content = e.target.result;
+        if (!content.includes('#EXTM3U') && !content.includes('#EXTINF:')) {
+          alert("Geçerli bir M3U dosyası değil!");
+          return;
+        }
+        parseM3U(content);
+      };
+      reader.readAsText(file);
+      showToast("Dosya başarıyla yüklendi.", "success");
+    });
+
+    function handleFileSelect() {
+      // Dosya seçildiğinde ek işlemler yapılabilir.
+    }
+
+	function loadM3U() {
+	  var vavooBtn = document.querySelector('.vavoo-btn');
+	  var m3uUrlVal = document.getElementById('m3uUrl').value.trim();
+	  var vavooUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
+	  
+	  if (m3uUrlVal !== vavooUrl) {
+		vavooBtn.style.background = "";
+	  }
+	  
+	  const url = m3uUrlVal;
+	  const fileInput = document.getElementById('m3uFile');
+	  const file = fileInput.files[0];
+	  
+	  if (url && !file) {
+		axios.get(url, { responseType: 'blob' })
+		  .then(response => {
+			const reader = new FileReader();
+			reader.onload = function(e) {
+			  const data = e.target.result;
+			  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
+				alert("Geçerli bir M3U dosyası değil!");
+				return;
+			  }
+			  parseM3U(data);
+			};
+			reader.readAsText(response.data);
+		  })
+		  .catch(error => {
+			console.error(error);
+			alert('M3U dosyası yüklenirken hata oluştu!');
+		  });
+	  } else if (file) {
+		const reader = new FileReader();
+		reader.onload = function(e) {
+		  const data = e.target.result;
+		  if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
+			alert("Geçerli bir M3U dosyası değil!");
+			return;
+		  }
+		  parseM3U(data);
+		};
+		reader.readAsText(file);
+	  } else {
+		alert("Lütfen geçerli bir URL girin veya dosya seçin!");
+	  }
+	}
+
+	function loadVavoo() {
+	  var vavooBtn = document.querySelector('.vavoo-btn');
+	  vavooBtn.style.background = "red";
+	  document.getElementById('m3uUrl').value = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
+	  loadM3U();
+	}
+
+    function parseM3U(data) {
+      const lines = data.split('\n').map(line => line.trim()).filter(line => line !== '');
+      const channels = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('#EXTINF:')) {
+          let category = "";
+          const groupMatch = line.match(/group-title="([^"]+)"/i);
+          if (groupMatch) category = groupMatch[1].trim();
+          let nameMatch = line.match(/tvg-name="([^"]+)"/i);
+          let name = nameMatch ? nameMatch[1].trim() : '';
+          if (!name) {
+            const parts = line.split(',');
+            name = parts.length > 1 ? parts[1].trim() : 'Bilinmeyen Kanal';
+          }
+          if (!name || name.match(/^[a-zA-Z0-9+\/=]{50,}$/)) name = 'Bilinmeyen Kanal';
+          if (!category) category = "Genel";
+          let j = i + 1;
+          while (j < lines.length && !lines[j].startsWith('http')) j++;
+          const channelUrl = lines[j] ? lines[j].trim() : '';
+          if (channelUrl) {
+            channels.push({ name, url: channelUrl, category });
+          }
+          i = j;
+        } else if (line.startsWith('http')) { 
+          const name = `Kanal ${channels.length + 1}`;
+          channels.push({ name, url: line, category: "Genel" });
+        }
+      }
+      allChannels = channels;
+      renderChannelList(channels);
+    }
+
+    document.addEventListener('keydown', function(e) {
+      const focusableItems = Array.from(document.querySelectorAll('.channel-row'));
+      const currentIndex = focusableItems.indexOf(document.activeElement);
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const prevIndex = currentIndex > 0 ? currentIndex - 1 : focusableItems.length - 1;
+        focusableItems[prevIndex].focus();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const nextIndex = currentIndex < focusableItems.length - 1 ? currentIndex + 1 : 0;
+        focusableItems[nextIndex].focus();
+      } else if (e.key === 'Enter') {
+        if (document.activeElement && document.activeElement.classList.contains('channel-row')) {
+          const channelUrl = document.activeElement.getAttribute('data-url');
+          const transformedUrl = transformUrl(channelUrl);
+          playChannel(transformedUrl, "Seçilen Kanal");
+        }
+      }
+    });
+  </script>
+</body>
+</html>
