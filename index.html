@@ -3,184 +3,219 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vavoo Proxy Stream</title>
+    <title>Vavoo Proxy Player</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/video.js@7.20.3/dist/video-js.min.css" rel="stylesheet">
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
+        .group-container {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
         }
-        #container {
-            width: 80%;
-            margin: 0 auto;
-            padding: 20px;
+        .group-container.open {
+            max-height: 2000px;
         }
-        #vavooButton {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            cursor: pointer;
-            margin-bottom: 20px;
+        .channel-list {
+            max-height: 70vh;
+            overflow-y: auto;
         }
-        #vavooButton:hover {
-            background-color: #45a049;
-        }
-        .group {
-            margin-bottom: 20px;
-        }
-        .group h3 {
-            cursor: pointer;
-            background-color: #ddd;
-            padding: 10px;
-            margin: 0;
-            font-size: 18px;
-        }
-        .channels {
-            display: none;
-            margin-top: 10px;
-        }
-        .channel {
-            background-color: #f9f9f9;
-            margin: 5px 0;
-            padding: 10px;
-            cursor: pointer;
-        }
-        .channel:hover {
-            background-color: #f1f1f1;
-        }
-        #videoPlayer {
+        .video-js {
             width: 100%;
-            height: 500px;
-            margin-top: 20px;
+            height: 100%;
+        }
+        .video-container {
+            height: 0;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            position: relative;
+        }
+        .video-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
         }
     </style>
 </head>
-<body>
-    <div id="container">
-        <button id="vavooButton">Vavoo Yayınları</button>
-        <div id="groupsContainer"></div>
-        <video id="videoPlayer" controls></video>
+<body class="bg-gray-900 text-white">
+    <div class="container mx-auto p-4">
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Vavoo Proxy Player</h1>
+            <button id="vavooBtn" class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg font-semibold">VAVOO</button>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-1">
+                <div id="channelGroups" class="bg-gray-800 rounded-lg p-4 overflow-hidden channel-list hidden">
+                    <!-- Kanal grupları buraya yüklenecek -->
+                    <div class="animate-pulse flex space-x-4">
+                        <div class="flex-1 space-y-3 py-1">
+                            <div class="h-4 bg-gray-700 rounded w-3/4"></div>
+                            <div class="h-4 bg-gray-700 rounded"></div>
+                            <div class="h-4 bg-gray-700 rounded w-5/6"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="md:col-span-2">
+                <div class="video-container bg-black rounded-lg overflow-hidden">
+                    <video id="videoPlayer" class="video-js vjs-big-play-centered vjs-fluid" controls preload="auto" data-setup='{}'>
+                        <p class="vjs-no-js">
+                            Video oynatıcıyı görüntülemek için JavaScript'i etkinleştirin
+                        </p>
+                    </video>
+                </div>
+                <h2 id="currentChannelName" class="text-xl font-semibold mt-4 mb-2 text-center">Kanal seçiniz</h2>
+                <p id="currentChannelInfo" class="text-sm text-gray-400 text-center"></p>
+            </div>
+        </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/video.js@7.20.3/dist/video.min.js"></script>
     <script>
-        document.getElementById("vavooButton").addEventListener("click", loadGroups);
+        const proxyUrl = 'https://wproxy.net';
+        const mainUrl = 'https://vavoo.to';
+        let channels = [];
+        let player;
+        let cookie = '';
+        
+        // Headers aynı şekilde tanımlanıyor
+        const headers = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+            "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Connection": "keep-alive",
+            "Referer": "https://wproxy.net",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "same-origin",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+            "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\""
+        };
 
-		async function loadGroups() {
-			try {
-				const cookie = await getCookie();
-				const response = await fetch("https://cors-anywhere.herokuapp.com/https://vavoo.to/channels", {
-					method: 'GET',
-					headers: {
-						"Accept": "application/json",
-						"Cookie": `PHPSESSID=${cookie}`,
-						"User-Agent": "Mozilla/5.0",
-					}
-				});
+        const posterLink = "https://raw.githubusercontent.com/doGior/doGiorsHadEnough/master/Huhu/tv.png";
 
-				// Check if the response is valid JSON
-				const text = await response.text();
-				try {
-					const channels = JSON.parse(text);
-					const groups = groupChannelsByCountry(channels);
-
-					const groupsContainer = document.getElementById("groupsContainer");
-					groupsContainer.innerHTML = ""; // Clear previous groups
-
-					for (const country in groups) {
-						const groupDiv = document.createElement("div");
-						groupDiv.classList.add("group");
-
-						const groupHeader = document.createElement("h3");
-						groupHeader.textContent = country;
-						groupHeader.addEventListener("click", () => toggleChannels(country));
-						groupDiv.appendChild(groupHeader);
-
-						const channelsDiv = document.createElement("div");
-						channelsDiv.classList.add("channels");
-						groups[country].forEach(channel => {
-							const channelDiv = document.createElement("div");
-							channelDiv.classList.add("channel");
-							channelDiv.textContent = channel.name;
-							channelDiv.addEventListener("click", () => playChannel(channel));
-							channelsDiv.appendChild(channelDiv);
-						});
-						groupDiv.appendChild(channelsDiv);
-
-						groupsContainer.appendChild(groupDiv);
-					}
-				} catch (e) {
-					console.error("Failed to parse response as JSON:", e);
-				}
-			} catch (error) {
-				console.error("Failed to load groups:", error);
-			}
-		}
-
-
-
-        function groupChannelsByCountry(channels) {
-            return channels.reduce((groups, channel) => {
-                if (!groups[channel.country]) {
-                    groups[channel.country] = [];
-                }
-                groups[channel.country].push(channel);
-                return groups;
-            }, {});
-        }
-
-        function toggleChannels(country) {
-            const channelsDiv = document.querySelector(`.group h3:contains(${country}) + .channels`);
-            channelsDiv.style.display = channelsDiv.style.display === "none" ? "block" : "none";
-        }
-
-        async function playChannel(channel) {
-            const cookie = await getCookie();
-            const response = await fetch(`https://sv1.wproxy.info/proxy.php/https://vavoo.to/play/${channel.id}/index.m3u8`, {
-                method: 'GET',
-                headers: {
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-                    "Connection": "keep-alive",
-                    "Referer": "https://wproxy.net",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-                    "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
-                    "sec-ch-ua-mobile": "?0",
-                    "sec-ch-ua-platform": "\"Windows\"",
-                    "Cookie": `PHPSESSID=${cookie}`
-                }
+        // Video.js player oluşturma
+        document.addEventListener('DOMContentLoaded', function() {
+            player = videojs('videoPlayer', {
+                responsive: true,
+                fluid: true,
+                poster: posterLink
             });
-            const streamUrl = await response.text();
-            const videoPlayer = document.getElementById("videoPlayer");
-            videoPlayer.src = streamUrl;
-            videoPlayer.play();
+        });
+
+        // Vavoo butonuna tıklama işlemi
+        document.getElementById('vavooBtn').addEventListener('click', function() {
+            document.getElementById('channelGroups').classList.remove('hidden');
+            fetchChannels();
+        });
+
+        // Kanalları getirme fonksiyonu
+        async function fetchChannels() {
+            try {
+                // Önce proxy'ye erişerek cookie alıyoruz
+                const mainReq = await fetch(proxyUrl);
+                const cookieHeader = mainReq.headers.get('set-cookie');
+                if (cookieHeader) {
+                    const phpSessionMatch = cookieHeader.match(/PHPSESSID=([^;]+)/);
+                    if (phpSessionMatch && phpSessionMatch[1]) {
+                        cookie = phpSessionMatch[1];
+                    }
+                }
+
+                // Kanalları yüklüyoruz
+                const response = await fetch(`https://sv1.wproxy.info/proxy.php/${mainUrl}/channels`, {
+                    headers: {
+                        ...headers,
+                        'Cookie': `PHPSESSID=${cookie}`
+                    }
+                });
+                channels = await response.json();
+                
+                // Kanalları ülkelere göre gruplandırıyoruz
+                const groupedChannels = {};
+                channels.forEach(channel => {
+                    if (!groupedChannels[channel.country]) {
+                        groupedChannels[channel.country] = [];
+                    }
+                    groupedChannels[channel.country].push(channel);
+                });
+                
+                renderChannelGroups(groupedChannels);
+            } catch (error) {
+                console.error('Kanallar yüklenirken hata oluştu:', error);
+                document.getElementById('channelGroups').innerHTML = '<p class="text-red-500">Kanallar yüklenemedi. Lütfen tekrar deneyin.</p>';
+            }
         }
 
-		async function getCookie() {
-			try {
-				// Attempt to get the PHPSESSID cookie
-				const response = await fetch("https://wproxy.net");
-				const cookies = response.headers.get('Set-Cookie');
+        // Kanal gruplarını render etme
+        function renderChannelGroups(groupedChannels) {
+            const channelGroupsElement = document.getElementById('channelGroups');
+            channelGroupsElement.innerHTML = '';
+            
+            // Grupları alfabetik sıraya göre düzenle
+            const sortedGroups = Object.keys(groupedChannels).sort();
+            
+            sortedGroups.forEach(group => {
+                const groupElement = document.createElement('div');
+                groupElement.className = 'mb-2';
+                
+                const groupHeader = document.createElement('div');
+                groupHeader.className = 'bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-600 flex justify-between items-center';
+                groupHeader.innerHTML = `
+                    <span class="font-semibold">${group}</span>
+                    <span class="text-sm">(${groupedChannels[group].length})</span>
+                `;
+                
+                const groupContent = document.createElement('div');
+                groupContent.className = 'group-container pl-4';
+                
+                groupedChannels[group].forEach(channel => {
+                    const channelElement = document.createElement('div');
+                    channelElement.className = 'py-2 border-b border-gray-700 cursor-pointer hover:bg-gray-700 px-2';
+                    channelElement.textContent = channel.name;
+                    channelElement.addEventListener('click', () => playChannel(channel));
+                    
+                    groupContent.appendChild(channelElement);
+                });
+                
+                groupHeader.addEventListener('click', () => {
+                    groupContent.classList.toggle('open');
+                });
+                
+                groupElement.appendChild(groupHeader);
+                groupElement.appendChild(groupContent);
+                channelGroupsElement.appendChild(groupElement);
+            });
+        }
 
-				// Check if cookies are present and parse the PHPSESSID
-				if (cookies) {
-					const match = cookies.match(/PHPSESSID=([^;]+)/);
-					if (match) {
-						return match[1]; // Return the PHPSESSID cookie value
-					}
-				}
-
-				// If PHPSESSID not found, log an error and return a fallback value
-				console.error("PHPSESSID cookie not found! Using fallback.");
-				return "default-cookie-value";  // Replace with your fallback value if needed
-			} catch (error) {
-				console.error("Error retrieving cookie:", error);
-				return "default-cookie-value";  // Fallback in case of an error
-			}
-		}
-
-
+        // Kanalı oynatma
+        function playChannel(channel) {
+            const streamUrl = `https://sv1.wproxy.info/proxy.php/${mainUrl}/play/${channel.id}/index.m3u8`;
+            
+            player.src({
+                src: streamUrl,
+                type: 'application/x-mpegURL'
+            });
+            
+            player.play();
+            
+            document.getElementById('currentChannelName').textContent = channel.name;
+            document.getElementById('currentChannelInfo').textContent = `Ülke: ${channel.country}`;
+            
+            // Video oynatıcı ayarlarını güncelle
+            player.httpSourceOptions = {
+                headers: {
+                    ...headers,
+                    'Cookie': `PHPSESSID=${cookie}`,
+                    'Referer': proxyUrl
+                }
+            };
+        }
     </script>
 </body>
 </html>
