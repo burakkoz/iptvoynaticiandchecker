@@ -376,7 +376,6 @@
   <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-  <script src="vavooLoader.js"></script>
   <script>
     // Global değişkenler
     let workingUrls = [];
@@ -944,128 +943,18 @@
       });
     });
     
-	document.getElementById('loadVavooBtn').addEventListener('click', async function () {
-		const proxyOptions = [
-			"https://sv1.wproxy.info/proxy.php/",
-			"https://corsproxy.io/?",
-			"https://burakkoz.burak-kozakbas.workers.dev/?url=",
-			""
-		];
-
-
-		  // Proxy URL ve kanal verileri için gerekli başlıklar
-		  const proxyUrl = "https://sv1.wproxy.info/proxy.php/"; // Proxy URL
-		  const mainUrl = "https://vavoo.to/channels"; // Vavoo kanal URL'si
-
-		  let cookie = "";
-
-		  // Kanal verilerini çekmek için fonksiyon
-		  async function getChannels() {
-			try {
-			  // Proxy URL'ye istek atarak PHPSESSID almak
-			  const mainReq = await fetch(proxyUrl, {
-				method: "GET",
-				headers: {
-				  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-				  "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-				  "Connection": "keep-alive",
-				  "Referer": "https://wproxy.net",
-				  "Sec-Fetch-Dest": "document",
-				  "Sec-Fetch-Mode": "navigate",
-				  "Sec-Fetch-Site": "same-origin",
-				  "Sec-Fetch-User": "?1",
-				  "Upgrade-Insecure-Requests": "1",
-				  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-				  "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
-				  "sec-ch-ua-mobile": "?0",
-				  "sec-ch-ua-platform": "\"Windows\""
-				}
-			  });
-
-			  const cookies = mainReq.headers.get('set-cookie');
-			  cookie = cookies.split(';')[0].split('=')[1]; // PHPSESSID alınır
-
-			  // Vavoo kanallarını almak için yeni istek
-			  const response = await fetch(`${proxyUrl}${mainUrl}`, {
-				method: "GET",
-				headers: {
-				  "Accept": "application/json",
-				  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-				},
-				cookies: {
-				  "PHPSESSID": cookie
-				}
-			  });
-
-			  if (!response.ok) throw new Error(`HTTP Hata Kodu: ${response.status}`);
-			  
-			  const channels = await response.json();  // Kanalların JSON formatında dönmesi bekleniyor
-			  renderVavooChannels(channels); // Kanalları HTML'e eklemek
-			} catch (error) {
-			  console.error("Kanal verileri alınamadı:", error);
-			  showToast("Vavoo kanalları yüklenirken hata oluştu!", "error");
-			}
-		  }
-
-		  // Kanalları listele ve tıklandığında kanal oynatma işlevi
-		  function renderVavooChannels(channels) {
-			const channelListDiv = document.getElementById('channelList');
-			channelListDiv.innerHTML = "";
-
-			channels.forEach(channel => {
-			  const channelItem = document.createElement('a');
-			  channelItem.className = 'list-group-item list-group-item-action channel-item';
-			  channelItem.href = "#";
-			  channelItem.textContent = `${channel.name} (${channel.country})`;
-			  channelItem.addEventListener('click', function (e) {
-				e.preventDefault();
-				playVavooChannel(channel.id, channel.name);
-			  });
-			  channelListDiv.appendChild(channelItem);
-			});
-		  }
-
-		  // Kanal oynatma fonksiyonu
-		  function playVavooChannel(channelId, channelName) {
-			const mainUrl = "https://vavoo.to";
-			const originalVideoUrl = `${mainUrl}/play/${channelId}/index.m3u8`;
-			playChannel(originalVideoUrl, channelName);
-		  }
-
-		  // Kanal oynatma için HLS.js ile video yükleme fonksiyonu
-		  function playChannel(url, name = "") {
-			const videoPlayer = document.getElementById('videoPlayer');
-			if (!url) {
-				showToast("Geçerli bir URL bulunamadı!", "error");
-				return;
-			}
-			if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
-				videoPlayer.src = url;
-				videoPlayer.load();
-				videoPlayer.play();
-			} else if (Hls.isSupported()) {
-				if (window.hls) {
-					window.hls.destroy();
-				}
-				window.hls = new Hls();
-				window.hls.loadSource(url);
-				window.hls.attachMedia(videoPlayer);
-				window.hls.on(Hls.Events.MANIFEST_PARSED, function () {
-					videoPlayer.play();
-				});
-			} else {
-				videoPlayer.src = url;
-				videoPlayer.load();
-				videoPlayer.play();
-			}
-			document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
-			document.getElementById("currentLink").value = url;
-		  }
-
-		  // Vavoo kanallarını yüklemek için butonun click eventini dinleyin
-		  document.getElementById('loadVavooBtn').addEventListener('click', getChannels);
-
-
+    // Vavoo Loader: Proxy kullanarak M3U URL güncelleme
+    function loadVavoo() {
+      const vavooBtn = document.querySelector('.vavoo-btn');
+      vavooBtn.style.background = "red";
+      const targetUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
+      const corsProxy = "https://burakkoz.burak-kozakbas.workers.dev/?url=";
+      const finalUrl = corsProxy + targetUrl;
+      const m3uUrlInput = document.getElementById('m3uUrl');
+      m3uUrlInput.dataset.fullurl = finalUrl;
+      m3uUrlInput.value = targetUrl;
+      loadM3U();
+    }
     
     // M3U dosyası yükleme: URL veya dosya seçimine göre
     function loadM3U() {
