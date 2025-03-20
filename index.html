@@ -987,7 +987,6 @@
 	function renderVavooChannels(channels, proxyUrl) {
 		const channelListDiv = document.getElementById('channelList');
 		channelListDiv.innerHTML = "";
-
 		channels.forEach(channel => {
 			const channelItem = document.createElement('a');
 			channelItem.className = 'list-group-item list-group-item-action channel-item';
@@ -1001,20 +1000,15 @@
 		});
 	}
 
+
 	function playVavooChannel(channelId, channelName, proxyUrl) {
 		const mainUrl = "https://vavoo.to";
 		const originalVideoUrl = `${mainUrl}/play/${channelId}/index.m3u8`;
 		const proxiedVideoUrl = proxyUrl ? `${proxyUrl}${originalVideoUrl}` : originalVideoUrl;
 
+
 		playChannel(proxiedVideoUrl, channelName);
 	}
-
-
-
-
-
-
-
 
     
     // M3U dosyası yükleme: URL veya dosya seçimine göre
