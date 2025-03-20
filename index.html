@@ -154,11 +154,11 @@
 
 		async function getCookie() {
 			try {
-				// Call the proxy to get the PHPSESSID cookie dynamically
+				// Attempt to get the PHPSESSID cookie
 				const response = await fetch("https://wproxy.net");
 				const cookies = response.headers.get('Set-Cookie');
-				
-				// Check if cookies are present
+
+				// Check if cookies are present and parse the PHPSESSID
 				if (cookies) {
 					const match = cookies.match(/PHPSESSID=([^;]+)/);
 					if (match) {
@@ -166,14 +166,15 @@
 					}
 				}
 
-				// If cookie is not found or something goes wrong, return a default or null
-				console.error("PHPSESSID cookie not found!");
-				return null;
+				// If PHPSESSID not found, log an error and return a fallback value
+				console.error("PHPSESSID cookie not found! Using fallback.");
+				return "default-cookie-value";  // Replace with your fallback value if needed
 			} catch (error) {
 				console.error("Error retrieving cookie:", error);
-				return null;
+				return "default-cookie-value";  // Fallback in case of an error
 			}
 		}
+
 
     </script>
 </body>
