@@ -167,25 +167,27 @@
     }
     
     // Kanalları çek
-    async function fetchChannels() {
-      try {
-        // CORS proxy kullanarak isteği yap
-        const corsProxy = 'https://corsproxy.io/?';
-        const targetUrl = 'https://vavoo.to/channels';
-        const response = await fetch(corsProxy + encodeURIComponent(targetUrl));
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        channels = data.channels || [];
-        displayChannels(channels);
-      } catch (error) {
-        console.error('Kanallar yüklenirken hata oluştu:', error);
-        document.getElementById('channelList').innerHTML = `<p class="error">Kanallar yüklenemedi: ${error.message}</p>`;
-      }
-    }
+	// Alternatif proxy servisleri
+	const proxyUrls = [
+	  "https://api.allorigins.win/raw?url=",
+	  "https://api.codetabs.com/v1/proxy?quest=",
+	  "https://cors-anywhere.herokuapp.com/",
+	  "https://crossorigin.me/"
+	];
+
+	async function fetchChannels() {
+	  for (const proxy of proxyUrls) {
+		try {
+		  const response = await fetch(`${proxy}https://vavoo.to/channels`);
+		  if (response.ok) {
+			return await response.json();
+		  }
+		} catch (e) {
+		  console.log(`${proxy} ile deneme başarısız: ${e.message}`);
+		}
+	  }
+	  throw new Error("Hiçbir proxy ile bağlantı kurulamadı");
+	}
     
     // Kanalları görüntüle
     function displayChannels(channelList) {
