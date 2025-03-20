@@ -255,25 +255,6 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
-	/* Vavoo kanalları için özel stiller */
-	.vavoo-channel {
-	  position: relative;
-	  border-left: 3px solid #dc2626;
-	}
-
-	.vavoo-channel::after {
-	  content: 'VAVOO';
-	  position: absolute;
-	  right: 10px;
-	  top: 50%;
-	  transform: translateY(-50%);
-	  font-size: 0.7rem;
-	  background: rgba(220, 38, 38, 0.8);
-	  color: white;
-	  padding: 2px 6px;
-	  border-radius: 4px;
-	  font-weight: bold;
-	}
   </style>
 </head>
 <body>
@@ -395,6 +376,7 @@
   <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="vavooLoader.js"></script>
   <script>
     // Global değişkenler
     let workingUrls = [];
@@ -464,124 +446,90 @@
     }
     
     // M3U dosyası işleme ve kanal listesini oluşturma (modüler yapı)
-	// parseM3U fonksiyonunu güncelle - Vavoo URL'leri için özel işlem ekle
-	function parseM3U(data) {
-	  const lines = data.split('\n').map(line => line.trim()).filter(line => line !== '');
-	  const channels = [];
-	  for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		if (line.startsWith('#EXTINF:')) {
-		  let category = "";
-		  const groupMatch = line.match(/group-title="([^"]+)"/i);
-		  if (groupMatch) category = groupMatch[1].trim();
-		  let nameMatch = line.match(/tvg-name="([^"]+)"/i);
-		  let name = nameMatch ? nameMatch[1].trim() : '';
-		  if (!name) {
-			const parts = line.split(',');
-			name = parts.length > 1 ? parts[1].trim() : 'Bilinmeyen Kanal';
-		  }
-		  if (!name || name.match(/^[a-zA-Z0-9+\/=]{50,}$/)) name = 'Bilinmeyen Kanal';
-		  if (!category) category = "Genel";
-		  let j = i + 1;
-		  while (j < lines.length && !lines[j].startsWith('http')) j++;
-		  const channelUrl = lines[j] ? lines[j].trim() : '';
-		  if (channelUrl) {
-			// Vavoo kanalları için data-vavoo özelliği ekle
-			const isVavoo = channelUrl.includes('vavoo.to') || channelUrl.includes('wproxy.info');
-			channels.push({ 
-			  name, 
-			  url: channelUrl, 
-			  category,
-			  isVavoo // Vavoo kanalı olup olmadığını işaretle
-			});
-		  }
-		  i = j;
-		} else if (line.startsWith('http')) {
-		  const name = `Kanal ${channels.length + 1}`;
-		  const isVavoo = line.includes('vavoo.to') || line.includes('wproxy.info');
-		  channels.push({ 
-			name, 
-			url: line, 
-			category: "Genel",
-			isVavoo
-		  });
-		}
-	  }
-	  allChannels = channels;
-	  renderChannelList(channels);
-	}
+    function parseM3U(data) {
+      const lines = data.split('\n').map(line => line.trim()).filter(line => line !== '');
+      const channels = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('#EXTINF:')) {
+          let category = "";
+          const groupMatch = line.match(/group-title="([^"]+)"/i);
+          if (groupMatch) category = groupMatch[1].trim();
+          let nameMatch = line.match(/tvg-name="([^"]+)"/i);
+          let name = nameMatch ? nameMatch[1].trim() : '';
+          if (!name) {
+            const parts = line.split(',');
+            name = parts.length > 1 ? parts[1].trim() : 'Bilinmeyen Kanal';
+          }
+          if (!name || name.match(/^[a-zA-Z0-9+\/=]{50,}$/)) name = 'Bilinmeyen Kanal';
+          if (!category) category = "Genel";
+          let j = i + 1;
+          while (j < lines.length && !lines[j].startsWith('http')) j++;
+          const channelUrl = lines[j] ? lines[j].trim() : '';
+          if (channelUrl) {
+            channels.push({ name, url: channelUrl, category });
+          }
+          i = j;
+        } else if (line.startsWith('http')) {
+          const name = `Kanal ${channels.length + 1}`;
+          channels.push({ name, url: line, category: "Genel" });
+        }
+      }
+      allChannels = channels;
+      renderChannelList(channels);
+    }
     
     // Kanal listesini DocumentFragment ile render etme
-	// Kanal listesi oluşturma fonksiyonunu güncelle
-	function renderChannelList(channels) {
-	  const grouped = {};
-	  channels.forEach(ch => {
-		if (!grouped[ch.category]) {
-		  grouped[ch.category] = [];
-		}
-		grouped[ch.category].push(ch);
-	  });
-	  
-	  const channelListDiv = document.getElementById('channelList');
-	  channelListDiv.innerHTML = '';
-	  const searchValue = document.getElementById("channelSearch").value.trim();
-	  const fragment = document.createDocumentFragment();
-	  
-	  for (let cat in grouped) {
-		const header = document.createElement('a');
-		header.className = 'list-group-item list-group-item-action group-header';
-		header.href = "#";
-		header.textContent = `${cat} (${grouped[cat].length})`;
-		header.addEventListener('click', function(e) {
-		  e.preventDefault();
-		  if (searchValue === "") {
-			const contentDiv = this.nextElementSibling;
-			contentDiv.style.display = (contentDiv.style.display === 'block') ? 'none' : 'block';
-		  }
-		});
-		fragment.appendChild(header);
-		
-		const groupContent = document.createElement('div');
-		groupContent.className = 'group-content';
-		groupContent.style.display = (searchValue !== "") ? 'block' : 'none';
-		
-		grouped[cat].forEach(ch => {
-		  const channelItem = document.createElement('a');
-		  channelItem.className = 'list-group-item list-group-item-action channel-item';
-		  if (ch.isVavoo) {
-			channelItem.className += ' vavoo-channel'; // Vavoo kanalları için özel stil
-		  }
-		  channelItem.href = "#";
-		  channelItem.textContent = ch.name;
-		  channelItem.dataset.url = ch.url;
-		  channelItem.dataset.isVavoo = ch.isVavoo;
-		  
-		  channelItem.addEventListener('click', function(e) {
-			e.preventDefault();
-			document.querySelectorAll('.channel-item.active').forEach(el => el.classList.remove('active'));
-			this.classList.add('active');
-			
-			try {
-			  if (ch.isVavoo) {
-				// Vavoo kanalları için özel işleme
-				playVavooChannel(ch.url, ch.name);
-			  } else {
-				// Normal kanallar için standart işleme
-				playChannel(ch.url, ch.name);
-			  }
-			} catch (error) {
-			  showToast("Geçersiz URL formatı!", "error");
-			}
-		  });
-		  
-		  groupContent.appendChild(channelItem);
-		});
-		
-		fragment.appendChild(groupContent);
-	  }
-	  
-	  channelListDiv.appendChild(fragment);
-	}
+    function renderChannelList(channels) {
+      const grouped = {};
+      channels.forEach(ch => {
+          if (!grouped[ch.category]) {
+              grouped[ch.category] = [];
+          }
+          grouped[ch.category].push(ch);
+      });
+      const channelListDiv = document.getElementById('channelList');
+      channelListDiv.innerHTML = '';
+      const searchValue = document.getElementById("channelSearch").value.trim();
+      const fragment = document.createDocumentFragment();
+      for (let cat in grouped) {
+          const header = document.createElement('a');
+          header.className = 'list-group-item list-group-item-action group-header';
+          header.href = "#";
+          header.textContent = `${cat} (${grouped[cat].length})`;
+          header.addEventListener('click', function(e) {
+              e.preventDefault();
+              if (searchValue === "") {
+                  const contentDiv = this.nextElementSibling;
+                  contentDiv.style.display = (contentDiv.style.display === 'block') ? 'none' : 'block';
+              }
+          });
+          fragment.appendChild(header);
+          const groupContent = document.createElement('div');
+          groupContent.className = 'group-content';
+          groupContent.style.display = (searchValue !== "") ? 'block' : 'none';
+          grouped[cat].forEach(ch => {
+              const channelItem = document.createElement('a');
+              channelItem.className = 'list-group-item list-group-item-action channel-item';
+              channelItem.href = "#";
+              channelItem.textContent = ch.name;
+              channelItem.addEventListener('click', function(e) {
+                  e.preventDefault();
+                  document.querySelectorAll('.channel-item.active').forEach(el => el.classList.remove('active'));
+                  this.classList.add('active');
+                  try {
+                      const transformedUrl = transformUrl(ch.url);
+                      playChannel(transformedUrl, ch.name);
+                  } catch (error) {
+                      showToast("Geçersiz URL formatı!", "error");
+                  }
+              });
+              groupContent.appendChild(channelItem);
+          });
+          fragment.appendChild(groupContent);
+      }
+      channelListDiv.appendChild(fragment);
+    }
     
     // Video oynatma fonksiyonu
     function playChannel(url, name = "") {
@@ -954,26 +902,6 @@
       
       // Delegation: Tablo içindeki kopyala, indir ve oynat butonları
       document.addEventListener('click', function(e) {
-	  
-		  if (e.target.closest('.channel-item')) {
-		    const channelItem = e.target.closest('.channel-item');
-		    document.querySelectorAll('.channel-item.active').forEach(el => el.classList.remove('active'));
-			channelItem.classList.add('active');
-			
-			// Vavoo URL'lerini işle
-			if (channelItem.dataset.url && channelItem.dataset.url.includes('vavoo.to')) {
-			  playVavooChannel(channelItem.dataset.url, channelItem.textContent);
-			} else {
-			  try {
-				const url = channelItem.dataset.url || '';
-				playChannel(url, channelItem.textContent);
-			  } catch (error) {
-				showToast("Geçersiz URL formatı!", "error");
-			  }
-			} 
-		}
-
-
           if (e.target.closest('.copy-btn')) {
               const btn = e.target.closest('.copy-btn');
               const link = btn.getAttribute('data-url');
@@ -1016,151 +944,74 @@
       });
     });
     
+	document.getElementById('loadVavooBtn').addEventListener('click', async function () {
+		const proxyOptions = [
+			"https://sv1.wproxy.info/proxy.php/",
+			"https://corsproxy.io/?",
+			"https://burakkoz.burak-kozakbas.workers.dev/?url=",
+			""
+		];
 
+		const mainUrl = "https://vavoo.to/channels";
+		let success = false;
 
+		for (const proxyUrl of proxyOptions) {
+			try {
+				showSpinner();
+				const response = await fetch(proxyUrl + mainUrl, {
+					headers: {
+						"Accept": "application/json",
+						"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+					}
+				});
 
-	// Vavoo kanallarını çekmek için proxy URL ve API fonksiyonu
-	const vavooApiUrl = "https://sv1.wproxy.info/proxy.php/https://vavoo.to/channels";
-	const vavooProxyBaseUrl = "https://sv1.wproxy.info/proxy.php/";
+				if (!response.ok) throw new Error(`HTTP Hata Kodu: ${response.status}`);
 
-	// PHPSESSID cookie'sini almak için proxy sunucusuna istek gönderir
-	async function getVavooSessionCookie() {
-	  try {
-		showSpinner();
-		const response = await axios.get("https://wproxy.net");
-		const cookies = response.headers['set-cookie'] || [];
-		const phpSessionId = cookies
-		  .find(cookie => cookie.includes('PHPSESSID'))
-		  ?.split(';')[0]
-		  ?.split('=')[1];
-		
-		if (!phpSessionId) {
-		  throw new Error("PHPSESSID cookie bulunamadı");
+				const channels = await response.json();
+				renderVavooChannels(channels, proxyUrl); // Proxy'yi kanallar listesine de aktar
+				hideSpinner();
+				showToast("Vavoo kanalları başarıyla yüklendi!", "success");
+				success = true;
+				break; // Çalışan proxy bulunduğunda döngüyü durdur
+			} catch (error) {
+				console.warn(`Proxy başarısız: ${proxyUrl}`, error);
+			}
 		}
-		
-		return phpSessionId;
-	  } catch (error) {
-		console.error("Proxy oturum hatası:", error);
-		showToast("Proxy sunucusuna bağlanılamadı", "error");
-		throw error;
-	  } finally {
-		hideSpinner();
-	  }
-	}
 
-	// Vavoo kanallarını yükler ve M3U formatına dönüştürür
-	async function fetchVavooChannels() {
-	  try {
-		showSpinner();
-		const phpSessionId = await getVavooSessionCookie();
-		
-		const response = await axios.get(vavooApiUrl, {
-		  headers: {
-			"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-			"Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-			"Connection": "keep-alive",
-			"Referer": "https://wproxy.net",
-			"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
-		  },
-		  withCredentials: true,
-		  headers: {
-			Cookie: `PHPSESSID=${phpSessionId}`
-		  }
-		});
-		
-		// Kanal listesini parse et
-		const channels = response.data;
-		
-		if (!Array.isArray(channels)) {
-		  throw new Error("Kanal listesi alınamadı, geçersiz format");
+		if (!success) {
+			hideSpinner();
+			showToast("Vavoo kanalları yüklenirken hata oluştu!", "error");
 		}
-		
-		// Kanalları ülkelere göre grupla
-		const channelsByCountry = {};
+	});
+
+	function renderVavooChannels(channels, proxyUrl) {
+		const channelListDiv = document.getElementById('channelList');
+		channelListDiv.innerHTML = "";
+
 		channels.forEach(channel => {
-		  if (!channelsByCountry[channel.country]) {
-			channelsByCountry[channel.country] = [];
-		  }
-		  channelsByCountry[channel.country].push(channel);
+			const channelItem = document.createElement('a');
+			channelItem.className = 'list-group-item list-group-item-action channel-item';
+			channelItem.href = "#";
+			channelItem.textContent = `${channel.name} (${channel.country})`;
+			channelItem.addEventListener('click', function (e) {
+				e.preventDefault();
+				playVavooChannel(channel.id, channel.name, proxyUrl);
+			});
+			channelListDiv.appendChild(channelItem);
 		});
-		
-		// M3U formatına dönüştür
-		let m3uContent = "#EXTM3U\n";
-		
-		Object.keys(channelsByCountry).forEach(country => {
-		  channelsByCountry[country].forEach(channel => {
-			const streamUrl = `${vavooProxyBaseUrl}https://vavoo.to/play/${channel.id}/index.m3u8`;
-			m3uContent += `#EXTINF:-1 tvg-id="${channel.id}" tvg-name="${channel.name}" group-title="${channel.country}",${channel.name}\n`;
-			m3uContent += `${streamUrl}\n`;
-		  });
-		});
-		
-		return m3uContent;
-	  } catch (error) {
-		console.error("Vavoo kanalları yüklenirken hata:", error);
-		showToast("Vavoo kanalları yüklenemedi: " + error.message, "error");
-		throw error;
-	  } finally {
-		hideSpinner();
-	  }
 	}
 
-	// Mevcut loadVavoo fonksiyonunu güncelle
-	async function loadVavoo() {
-	  try {
-		// Vavoo butonunu kırmızı yap
-		const vavooBtn = document.querySelector('.vavoo-btn');
-		vavooBtn.style.background = "linear-gradient(45deg, #dc2626, #b91c1c)";
-		vavooBtn.disabled = true;
-		vavooBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Yükleniyor';
-		
-		// Vavoo kanallarını yükle
-		const m3uContent = await fetchVavooChannels();
-		
-		// Kanalları parse et
-		parseM3U(m3uContent);
-		
-		// Başarılı mesajı göster
-		showToast("Vavoo kanalları başarıyla yüklendi", "success");
-		
-		// Butonu normale döndür
-		vavooBtn.style.background = "linear-gradient(45deg, #f59e0b, #d97706)";
-		vavooBtn.disabled = false;
-		vavooBtn.innerHTML = 'Vavoo';
-		
-	  } catch (error) {
-		console.error("Vavoo yükleme hatası:", error);
-		showToast("Vavoo kanalları yüklenemedi", "error");
-		
-		// Butonu sıfırla
-		const vavooBtn = document.querySelector('.vavoo-btn');
-		vavooBtn.style.background = "linear-gradient(45deg, #f59e0b, #d97706)";
-		vavooBtn.disabled = false;
-		vavooBtn.innerHTML = 'Vavoo';
-	  }
+	function playVavooChannel(channelId, channelName, proxyUrl) {
+		const mainUrl = "https://vavoo.to";
+		const originalVideoUrl = `${mainUrl}/play/${channelId}/index.m3u8`;
+		const proxiedVideoUrl = proxyUrl ? `${proxyUrl}${originalVideoUrl}` : originalVideoUrl;
+
+		playChannel(proxiedVideoUrl, channelName);
 	}
 
-	// Vavoo kanallarını oynatabilmek için özel işleyici
-	function playVavooChannel(url, name) {
-	  // Vavoo URL'lerini kontrol et
-	  if (url.includes('vavoo.to/play')) {
-		try {
-		  // URL'yi proxy ile değiştir
-		  const proxyUrl = url.replace('https://vavoo.to', vavooProxyBaseUrl + 'https://vavoo.to');
-		  
-		  // Oynatma fonksiyonunu çağır
-		  playChannel(proxyUrl, name);
-		  
-		  showToast(`${name} oynatılıyor...`, "success");
-		} catch (error) {
-		  console.error("Vavoo kanalı oynatılırken hata:", error);
-		  showToast("Kanal oynatılamadı", "error");
-		}
-	  } else {
-		// Normal kanallar için standart oynatma
-		playChannel(url, name);
-	  }
-	}
+
+
+
 
 
 
