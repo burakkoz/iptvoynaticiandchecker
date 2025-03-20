@@ -952,63 +952,119 @@
 			""
 		];
 
-		const mainUrl = "https://vavoo.to/channels";
-		let success = false;
 
-		for (const proxyUrl of proxyOptions) {
+		  // Proxy URL ve kanal verileri için gerekli başlıklar
+		  const proxyUrl = "https://sv1.wproxy.info/proxy.php/"; // Proxy URL
+		  const mainUrl = "https://vavoo.to/channels"; // Vavoo kanal URL'si
+
+		  let cookie = "";
+
+		  // Kanal verilerini çekmek için fonksiyon
+		  async function getChannels() {
 			try {
-				showSpinner();
-				const response = await fetch(proxyUrl + mainUrl, {
-					headers: {
-						"Accept": "application/json",
-						"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
-					}
-				});
+			  // Proxy URL'ye istek atarak PHPSESSID almak
+			  const mainReq = await fetch(proxyUrl, {
+				method: "GET",
+				headers: {
+				  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+				  "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+				  "Connection": "keep-alive",
+				  "Referer": "https://wproxy.net",
+				  "Sec-Fetch-Dest": "document",
+				  "Sec-Fetch-Mode": "navigate",
+				  "Sec-Fetch-Site": "same-origin",
+				  "Sec-Fetch-User": "?1",
+				  "Upgrade-Insecure-Requests": "1",
+				  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+				  "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
+				  "sec-ch-ua-mobile": "?0",
+				  "sec-ch-ua-platform": "\"Windows\""
+				}
+			  });
 
-				if (!response.ok) throw new Error(`HTTP Hata Kodu: ${response.status}`);
+			  const cookies = mainReq.headers.get('set-cookie');
+			  cookie = cookies.split(';')[0].split('=')[1]; // PHPSESSID alınır
 
-				const channels = await response.json();
-				renderVavooChannels(channels, proxyUrl); // Proxy'yi kanallar listesine de aktar
-				hideSpinner();
-				showToast("Vavoo kanalları başarıyla yüklendi!", "success");
-				success = true;
-				break; // Çalışan proxy bulunduğunda döngüyü durdur
+			  // Vavoo kanallarını almak için yeni istek
+			  const response = await fetch(`${proxyUrl}${mainUrl}`, {
+				method: "GET",
+				headers: {
+				  "Accept": "application/json",
+				  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+				},
+				cookies: {
+				  "PHPSESSID": cookie
+				}
+			  });
+
+			  if (!response.ok) throw new Error(`HTTP Hata Kodu: ${response.status}`);
+			  
+			  const channels = await response.json();  // Kanalların JSON formatında dönmesi bekleniyor
+			  renderVavooChannels(channels); // Kanalları HTML'e eklemek
 			} catch (error) {
-				console.warn(`Proxy başarısız: ${proxyUrl}`, error);
+			  console.error("Kanal verileri alınamadı:", error);
+			  showToast("Vavoo kanalları yüklenirken hata oluştu!", "error");
 			}
-		}
+		  }
 
-		if (!success) {
-			hideSpinner();
-			showToast("Vavoo kanalları yüklenirken hata oluştu!", "error");
-		}
-	});
+		  // Kanalları listele ve tıklandığında kanal oynatma işlevi
+		  function renderVavooChannels(channels) {
+			const channelListDiv = document.getElementById('channelList');
+			channelListDiv.innerHTML = "";
 
-	function renderVavooChannels(channels, proxyUrl) {
-		const channelListDiv = document.getElementById('channelList');
-		channelListDiv.innerHTML = "";
-		channels.forEach(channel => {
-			const channelItem = document.createElement('a');
-			channelItem.className = 'list-group-item list-group-item-action channel-item';
-			channelItem.href = "#";
-			channelItem.textContent = `${channel.name} (${channel.country})`;
-			channelItem.addEventListener('click', function (e) {
+			channels.forEach(channel => {
+			  const channelItem = document.createElement('a');
+			  channelItem.className = 'list-group-item list-group-item-action channel-item';
+			  channelItem.href = "#";
+			  channelItem.textContent = `${channel.name} (${channel.country})`;
+			  channelItem.addEventListener('click', function (e) {
 				e.preventDefault();
-				playVavooChannel(channel.id, channel.name, proxyUrl);
+				playVavooChannel(channel.id, channel.name);
+			  });
+			  channelListDiv.appendChild(channelItem);
 			});
-			channelListDiv.appendChild(channelItem);
-		});
-	}
+		  }
 
+		  // Kanal oynatma fonksiyonu
+		  function playVavooChannel(channelId, channelName) {
+			const mainUrl = "https://vavoo.to";
+			const originalVideoUrl = `${mainUrl}/play/${channelId}/index.m3u8`;
+			playChannel(originalVideoUrl, channelName);
+		  }
 
-	function playVavooChannel(channelId, channelName, proxyUrl) {
-		const mainUrl = "https://vavoo.to";
-		const originalVideoUrl = `${mainUrl}/play/${channelId}/index.m3u8`;
-		const proxiedVideoUrl = proxyUrl ? `${proxyUrl}${originalVideoUrl}` : originalVideoUrl;
+		  // Kanal oynatma için HLS.js ile video yükleme fonksiyonu
+		  function playChannel(url, name = "") {
+			const videoPlayer = document.getElementById('videoPlayer');
+			if (!url) {
+				showToast("Geçerli bir URL bulunamadı!", "error");
+				return;
+			}
+			if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
+				videoPlayer.src = url;
+				videoPlayer.load();
+				videoPlayer.play();
+			} else if (Hls.isSupported()) {
+				if (window.hls) {
+					window.hls.destroy();
+				}
+				window.hls = new Hls();
+				window.hls.loadSource(url);
+				window.hls.attachMedia(videoPlayer);
+				window.hls.on(Hls.Events.MANIFEST_PARSED, function () {
+					videoPlayer.play();
+				});
+			} else {
+				videoPlayer.src = url;
+				videoPlayer.load();
+				videoPlayer.play();
+			}
+			document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
+			document.getElementById("currentLink").value = url;
+		  }
 
+		  // Vavoo kanallarını yüklemek için butonun click eventini dinleyin
+		  document.getElementById('loadVavooBtn').addEventListener('click', getChannels);
 
-		playChannel(proxiedVideoUrl, channelName);
-	}
 
     
     // M3U dosyası yükleme: URL veya dosya seçimine göre
