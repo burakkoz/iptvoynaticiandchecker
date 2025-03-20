@@ -67,52 +67,53 @@
     <script>
         document.getElementById("vavooButton").addEventListener("click", loadGroups);
 
-        async function loadGroups() {
-            const cookie = await getCookie();
-            const response = await fetch("https://sv1.wproxy.info/proxy.php/https://vavoo.to/channels", {
-                method: 'GET',
-                headers: {
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                    "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
-                    "Connection": "keep-alive",
-                    "Referer": "https://wproxy.net",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-                    "sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
-                    "sec-ch-ua-mobile": "?0",
-                    "sec-ch-ua-platform": "\"Windows\"",
-                    "Cookie": `PHPSESSID=${cookie}`
-                }
-            });
+		async function loadGroups() {
+			const cookie = await getCookie();
+			const response = await fetch("https://cors-anywhere.herokuapp.com/https://vavoo.to/channels", {
+				method: 'GET',
+				headers: {
+					"Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+					"Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7",
+					"Connection": "keep-alive",
+					"Referer": "https://wproxy.net",
+					"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+					"sec-ch-ua": "\"Chromium\";v=\"134\", \"Not:A-Brand\";v=\"24\", \"Google Chrome\";v=\"134\"",
+					"sec-ch-ua-mobile": "?0",
+					"sec-ch-ua-platform": "\"Windows\"",
+					"Cookie": `PHPSESSID=${cookie}`
+				}
+			});
 
-            const channels = await response.json();
-            const groups = groupChannelsByCountry(channels);
+			const channels = await response.json();
+			const groups = groupChannelsByCountry(channels);
 
-            const groupsContainer = document.getElementById("groupsContainer");
-            groupsContainer.innerHTML = ""; // Clear previous groups
+			const groupsContainer = document.getElementById("groupsContainer");
+			groupsContainer.innerHTML = ""; // Clear previous groups
 
-            for (const country in groups) {
-                const groupDiv = document.createElement("div");
-                groupDiv.classList.add("group");
+			for (const country in groups) {
+				const groupDiv = document.createElement("div");
+				groupDiv.classList.add("group");
 
-                const groupHeader = document.createElement("h3");
-                groupHeader.textContent = country;
-                groupHeader.addEventListener("click", () => toggleChannels(country));
-                groupDiv.appendChild(groupHeader);
+				const groupHeader = document.createElement("h3");
+				groupHeader.textContent = country;
+				groupHeader.addEventListener("click", () => toggleChannels(country));
+				groupDiv.appendChild(groupHeader);
 
-                const channelsDiv = document.createElement("div");
-                channelsDiv.classList.add("channels");
-                groups[country].forEach(channel => {
-                    const channelDiv = document.createElement("div");
-                    channelDiv.classList.add("channel");
-                    channelDiv.textContent = channel.name;
-                    channelDiv.addEventListener("click", () => playChannel(channel));
-                    channelsDiv.appendChild(channelDiv);
-                });
-                groupDiv.appendChild(channelsDiv);
+				const channelsDiv = document.createElement("div");
+				channelsDiv.classList.add("channels");
+				groups[country].forEach(channel => {
+					const channelDiv = document.createElement("div");
+					channelDiv.classList.add("channel");
+					channelDiv.textContent = channel.name;
+					channelDiv.addEventListener("click", () => playChannel(channel));
+					channelsDiv.appendChild(channelDiv);
+				});
+				groupDiv.appendChild(channelsDiv);
 
-                groupsContainer.appendChild(groupDiv);
-            }
-        }
+				groupsContainer.appendChild(groupDiv);
+			}
+		}
+
 
         function groupChannelsByCountry(channels) {
             return channels.reduce((groups, channel) => {
