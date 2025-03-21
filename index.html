@@ -478,61 +478,115 @@
       renderChannelList(channels);
     }
     
-	// Vavoo kanalları için kanal listesini oluşturma fonksiyonunu güncelleyelim
-	function renderChannelList(channels) {
-		const grouped = {};
-		channels.forEach(ch => {
-			if (!grouped[ch.category]) {
-				grouped[ch.category] = [];
-			}
-			grouped[ch.category].push(ch);
-		});
-		const channelListDiv = document.getElementById('channelList');
-		channelListDiv.innerHTML = '';
-		const searchValue = document.getElementById("channelSearch").value.trim();
-		const fragment = document.createDocumentFragment();
-		for (let cat in grouped) {
-			const header = document.createElement('a');
-			header.className = 'list-group-item list-group-item-action group-header';
-			header.href = "#";
-			header.textContent = `${cat} (${grouped[cat].length})`;
-			header.addEventListener('click', function(e) {
-				e.preventDefault();
-				if (searchValue === "") {
-					const contentDiv = this.nextElementSibling;
-					contentDiv.style.display = (contentDiv.style.display === 'block') ? 'none' : 'block';
-				}
-			});
-			fragment.appendChild(header);
-			const groupContent = document.createElement('div');
-			groupContent.className = 'group-content';
-			groupContent.style.display = (searchValue !== "") ? 'block' : 'none';
-			grouped[cat].forEach(ch => {
-				const channelItem = document.createElement('a');
-				channelItem.className = 'list-group-item list-group-item-action channel-item';
-				channelItem.href = "#";
-				channelItem.textContent = ch.name;
-				channelItem.addEventListener('click', function(e) {
-					e.preventDefault();
-					document.querySelectorAll('.channel-item.active').forEach(el => el.classList.remove('active'));
-					this.classList.add('active');
-					try {
-						const transformedUrl = transformUrl(ch.url);
-						playChannel(transformedUrl, ch.name);
-					} catch (error) {
-						showToast("Geçersiz URL formatı!", "error");
-					}
-				});
-				groupContent.appendChild(channelItem);
-			});
-			fragment.appendChild(groupContent);
-		}
-		channelListDiv.appendChild(fragment);
+    // Kanal listesini DocumentFragment ile render etme
+    function renderChannelList(channels) {
+      const grouped = {};
+      channels.forEach(ch => {
+          if (!grouped[ch.category]) {
+              grouped[ch.category] = [];
+          }
+          grouped[ch.category].push(ch);
+      });
+      const channelListDiv = document.getElementById('channelList');
+      channelListDiv.innerHTML = '';
+      const searchValue = document.getElementById("channelSearch").value.trim();
+      const fragment = document.createDocumentFragment();
+      for (let cat in grouped) {
+          const header = document.createElement('a');
+          header.className = 'list-group-item list-group-item-action group-header';
+          header.href = "#";
+          header.textContent = `${cat} (${grouped[cat].length})`;
+          header.addEventListener('click', function(e) {
+              e.preventDefault();
+              if (searchValue === "") {
+                  const contentDiv = this.nextElementSibling;
+                  contentDiv.style.display = (contentDiv.style.display === 'block') ? 'none' : 'block';
+              }
+          });
+          fragment.appendChild(header);
+          const groupContent = document.createElement('div');
+          groupContent.className = 'group-content';
+          groupContent.style.display = (searchValue !== "") ? 'block' : 'none';
+          grouped[cat].forEach(ch => {
+              const channelItem = document.createElement('a');
+              channelItem.className = 'list-group-item list-group-item-action channel-item';
+              channelItem.href = "#";
+              channelItem.textContent = ch.name;
+              channelItem.addEventListener('click', function(e) {
+                  e.preventDefault();
+                  document.querySelectorAll('.channel-item.active').forEach(el => el.classList.remove('active'));
+                  this.classList.add('active');
+                  try {
+                      const transformedUrl = transformUrl(ch.url);
+                      playChannel(transformedUrl, ch.name);
+                  } catch (error) {
+                      showToast("Geçersiz URL formatı!", "error");
+                  }
+              });
+              groupContent.appendChild(channelItem);
+          });
+          fragment.appendChild(groupContent);
+      }
+      channelListDiv.appendChild(fragment);
+    }
+    
+    // Video oynatma fonksiyonu
+	function playChannel(url, name = "") {
+	  // Proxy URL'nizi burada tanımlayın:
+	  const corsProxy = "https://burakkoz.burak-kozakbas.workers.dev/?url=";
+	  // Eğer URL hâlihazırda proxy kullanılmadan geldiyse, proxy'yi ekleyelim:
+	  if (!url.startsWith(corsProxy)) {
+		url = corsProxy + url;
+	  }
+	  
+	  const videoPlayer = document.getElementById('videoPlayer');
+	  if (!url) {
+		  showToast("Geçerli bir URL bulunamadı!", "error");
+		  return;
+	  }
+	  if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
+		  videoPlayer.src = url;
+		  videoPlayer.load();
+		  videoPlayer.play();
+	  } else if (Hls.isSupported()) {
+		  if (window.hls) {
+			  window.hls.destroy();
+		  }
+		  window.hls = new Hls();
+		  window.hls.loadSource(url);
+		  window.hls.attachMedia(videoPlayer);
+		  window.hls.on(Hls.Events.MANIFEST_PARSED, function () {
+			  videoPlayer.play();
+		  });
+	  } else {
+		  videoPlayer.src = url;
+		  videoPlayer.load();
+		  videoPlayer.play();
+	  }
+	  document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
+	  document.getElementById("currentLink").value = url;
 	}
-    
 
     
-
+    // URL dönüşüm fonksiyonu (hatalı formatlarda net hata fırlatır)
+    function transformUrl(url) {
+      try {
+          const urlObj = new URL(url);
+          let path = urlObj.pathname;
+          if (path.endsWith('/')) {
+              path = path.slice(0, -1);
+          }
+          const segments = path.split('/');
+          const lastSegment = segments[segments.length - 1];
+          if (lastSegment.includes('.')) {
+              return url;
+          }
+          urlObj.pathname = '/live' + path + '.m3u8';
+          return urlObj.toString();
+      } catch (error) {
+          throw new Error("Geçersiz URL formatı");
+      }
+    }
     
     // DataTable başlatma
     function initDataTable() {
@@ -825,177 +879,90 @@
       cancelTokens = [];
     }
     
-	// DOMContentLoaded event listener'ına proxy kontrolü için bir toggle butonu ekleyelim
-	document.addEventListener('DOMContentLoaded', function() {
-		// Mevcut event listener'lar korundu
-		document.getElementById('m3uFile').addEventListener('change', handleFileSelect);
-		document.getElementById('loadChannelsBtn').addEventListener('click', loadM3U);
-		document.getElementById('loadVavooBtn').addEventListener('click', loadVavoo);
-		document.getElementById('applyLinkBtn').addEventListener('click', function() {
-			const editedUrl = document.getElementById('currentLink').value.trim();
-			if (editedUrl) {
-				try {
-					playChannel(editedUrl);
-					showToast("Düzenlenen link ile oynatılıyor...", "success");
-				} catch (error) {
-					showToast("Link işlenirken hata oluştu!", "error");
-				}
-			} else {
-				showToast("Lütfen geçerli bir link girin!", "error");
-			}
-		});
-		document.getElementById('clearBtn').addEventListener('click', clearData);
-		document.getElementById('downloadBtn').addEventListener('click', downloadTXT);
-		document.getElementById('startScanBtn').addEventListener('click', startScan);
-		document.getElementById('toggleScanBtn').addEventListener('click', toggleScan);
-		document.getElementById("channelSearch").addEventListener("input", debounce(() => {
-			const query = document.getElementById("channelSearch").value.trim().toLowerCase();
-			const filtered = allChannels.filter(ch => ch.name.toLowerCase().includes(query));
-			renderChannelList(filtered);
-		}, 300));
-		
-		// Proxy toggle butonu oluşturalım ve ekleyelim
-		const controlsContainer = document.querySelector('.card-footer') || document.getElementById('videoControls');
-		if (controlsContainer) {
-			const proxyToggle = document.createElement('div');
-			proxyToggle.className = 'form-check form-switch';
-			proxyToggle.innerHTML = `
-				<input class="form-check-input" type="checkbox" id="proxyToggle">
-				<label class="form-check-label" for="proxyToggle">Proxy Kullan</label>
-			`;
-			controlsContainer.appendChild(proxyToggle);
-			
-			// Toggle'a event listener ekleyelim
-			document.getElementById('proxyToggle').addEventListener('change', function(e) {
-				useProxy = e.target.checked;
-				showToast(useProxy ? "Proxy aktif edildi" : "Proxy devre dışı bırakıldı", "info");
-				// Eğer şu anda bir kanal oynatılıyorsa, aynı kanalı yeni ayarla tekrar oynat
-				const currentUrl = document.getElementById('currentLink').value.trim();
-				if (currentUrl) {
-					// Proxy prefix'ini kaldıralım (eğer varsa)
-					let cleanUrl = currentUrl;
-					if (currentUrl.startsWith(corsProxy)) {
-						cleanUrl = currentUrl.substring(corsProxy.length);
-					}
-					playChannel(cleanUrl);
-				}
-			});
-		}
-		
-		// Delegation: Tablo içindeki kopyala, indir ve oynat butonları
-		document.addEventListener('click', function(e) {
-			if (e.target.closest('.copy-btn')) {
-				const btn = e.target.closest('.copy-btn');
-				const link = btn.getAttribute('data-url');
-				navigator.clipboard.writeText(link);
-				showToast('Bağlantı panoya kopyalandı!', 'success');
-			}
-			if (e.target.closest('.download-btn')) {
-				const btn = e.target.closest('.download-btn');
-				const link = btn.getAttribute('data-url');
-				try {
-					const urlObj = new URL(link);
-					const username = urlObj.searchParams.get('username') || 'download';
-					const filename = `tv_channels_${username}.m3u`;
-					const a = document.createElement('a');
-					a.href = link;
-					a.download = filename;
-					document.body.appendChild(a);
-					a.click();
-					document.body.removeChild(a);
-				} catch (error) {
-					showToast("Link indirilemedi!", "error");
-				}
-			}
-			if (e.target.closest('.table-play-btn')) {
-				const btn = e.target.closest('.table-play-btn');
-				const originalLink = btn.getAttribute('data-url');
-				try {
-					const urlObj = new URL(originalLink);
-					urlObj.searchParams.set('type', 'm3u_plus');
-					urlObj.searchParams.set('output', 'hls');
-					const newLink = urlObj.toString();
-					document.getElementById("m3uUrl").value = newLink;
-					showToast('M3U URL güncellendi ve kanal listesi yükleniyor...', 'success');
-					loadM3U();
-				} catch (error) {
-					console.error("Link işlenirken hata:", error);
-					showToast("Link işlenirken hata oluştu!", 'error');
-				}
-			}
-		});
-	});
+    // DOMContentLoaded: Tüm event listenerlar burada ekleniyor (inline onclick'ler kaldırıldı)
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('m3uFile').addEventListener('change', handleFileSelect);
+      document.getElementById('loadChannelsBtn').addEventListener('click', loadM3U);
+      document.getElementById('loadVavooBtn').addEventListener('click', loadVavoo);
+      document.getElementById('applyLinkBtn').addEventListener('click', function() {
+          const editedUrl = document.getElementById('currentLink').value.trim();
+          if (editedUrl) {
+              try {
+                  playChannel(editedUrl);
+                  showToast("Düzenlenen link ile oynatılıyor...", "success");
+              } catch (error) {
+                  showToast("Link işlenirken hata oluştu!", "error");
+              }
+          } else {
+              showToast("Lütfen geçerli bir link girin!", "error");
+          }
+      });
+      document.getElementById('clearBtn').addEventListener('click', clearData);
+      document.getElementById('downloadBtn').addEventListener('click', downloadTXT);
+      document.getElementById('startScanBtn').addEventListener('click', startScan);
+      document.getElementById('toggleScanBtn').addEventListener('click', toggleScan);
+      document.getElementById("channelSearch").addEventListener("input", debounce(() => {
+          const query = document.getElementById("channelSearch").value.trim().toLowerCase();
+          const filtered = allChannels.filter(ch => ch.name.toLowerCase().includes(query));
+          renderChannelList(filtered);
+      }, 300));
+      
+      // Delegation: Tablo içindeki kopyala, indir ve oynat butonları
+      document.addEventListener('click', function(e) {
+          if (e.target.closest('.copy-btn')) {
+              const btn = e.target.closest('.copy-btn');
+              const link = btn.getAttribute('data-url');
+              navigator.clipboard.writeText(link);
+              showToast('Bağlantı panoya kopyalandı!', 'success');
+          }
+          if (e.target.closest('.download-btn')) {
+              const btn = e.target.closest('.download-btn');
+              const link = btn.getAttribute('data-url');
+              try {
+                  const urlObj = new URL(link);
+                  const username = urlObj.searchParams.get('username') || 'download';
+                  const filename = `tv_channels_${username}.m3u`;
+                  const a = document.createElement('a');
+                  a.href = link;
+                  a.download = filename;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+              } catch (error) {
+                  showToast("Link indirilemedi!", "error");
+              }
+          }
+          if (e.target.closest('.table-play-btn')) {
+              const btn = e.target.closest('.table-play-btn');
+              const originalLink = btn.getAttribute('data-url');
+              try {
+                  const urlObj = new URL(originalLink);
+                  urlObj.searchParams.set('type', 'm3u_plus');
+                  urlObj.searchParams.set('output', 'hls');
+                  const newLink = urlObj.toString();
+                  document.getElementById("m3uUrl").value = newLink;
+                  showToast('M3U URL güncellendi ve kanal listesi yükleniyor...', 'success');
+                  loadM3U();
+              } catch (error) {
+                  console.error("Link işlenirken hata:", error);
+                  showToast("Link işlenirken hata oluştu!", 'error');
+              }
+          }
+      });
+    });
     
-	// Proxy adresini sabit bir değişkene atayalım
-	const corsProxy = "https://burakkoz.burak-kozakbas.workers.dev/?url=";
-	let useProxy = false; // Proxy kullanımını kontrol etmek için global değişken
-
-	// Mevcut transformUrl fonksiyonunu güncelleyelim
-	function transformUrl(url) {
-		try {
-			const urlObj = new URL(url);
-			let path = urlObj.pathname;
-			if (path.endsWith('/')) {
-				path = path.slice(0, -1);
-			}
-			const segments = path.split('/');
-			const lastSegment = segments[segments.length - 1];
-			if (lastSegment.includes('.')) {
-				return useProxy ? corsProxy + url : url;
-			}
-			urlObj.pathname = '/live' + path + '.m3u8';
-			return useProxy ? corsProxy + urlObj.toString() : urlObj.toString();
-		} catch (error) {
-			throw new Error("Geçersiz URL formatı");
-		}
-	}
-
-	// Video oynatma fonksiyonunu güncelleyelim
-	function playChannel(url, name = "") {
-		const videoPlayer = document.getElementById('videoPlayer');
-		if (!url) {
-			showToast("Geçerli bir URL bulunamadı!", "error");
-			return;
-		}
-		
-		// URL'nin proxy eklenmiş olup olmadığını kontrol edelim
-		const finalUrl = url.startsWith(corsProxy) ? url : (useProxy ? corsProxy + url : url);
-		
-		if (finalUrl.endsWith('.mkv') || finalUrl.endsWith('.mp4')) {
-			videoPlayer.src = finalUrl;
-			videoPlayer.load();
-			videoPlayer.play();
-		} else if (Hls.isSupported()) {
-			if (window.hls) {
-				window.hls.destroy();
-			}
-			window.hls = new Hls();
-			window.hls.loadSource(finalUrl);
-			window.hls.attachMedia(videoPlayer);
-			window.hls.on(Hls.Events.MANIFEST_PARSED, function () {
-				videoPlayer.play();
-			});
-		} else {
-			videoPlayer.src = finalUrl;
-			videoPlayer.load();
-			videoPlayer.play();
-		}
-		document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
-		document.getElementById("currentLink").value = finalUrl;
-	}
-
-	// Vavoo Loader fonksiyonunu güncelleyelim
-	function loadVavoo() {
-		const vavooBtn = document.querySelector('.vavoo-btn');
-		vavooBtn.style.background = "red";
-		const targetUrl = "https://joaquinito02.es/vavoo/index_Turkey.m3u";
-		const finalUrl = corsProxy + targetUrl;
-		const m3uUrlInput = document.getElementById('m3uUrl');
-		m3uUrlInput.dataset.fullurl = finalUrl;
-		m3uUrlInput.value = targetUrl;
-		useProxy = true; // Vavoo yüklendiğinde proxy kullanımını aktif et
-		loadM3U();
-	}
+    // Vavoo Loader: Proxy kullanarak M3U URL güncelleme
+    function loadVavoo() {
+      const vavooBtn = document.querySelector('.vavoo-btn');
+      vavooBtn.style.background = "red";
+      const targetUrl = "https://joaquinito02.es/vavoo/index_Turkey.m3u";
+      const corsProxy = "https://burakkoz.burak-kozakbas.workers.dev/?url=";
+      const finalUrl = corsProxy + targetUrl;
+      const m3uUrlInput = document.getElementById('m3uUrl');
+      m3uUrlInput.dataset.fullurl = finalUrl;
+      m3uUrlInput.value = targetUrl;
+      loadM3U();
+    }
     
     // M3U dosyası yükleme: URL veya dosya seçimine göre
     function loadM3U() {
