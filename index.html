@@ -791,13 +791,16 @@
           channelItem.className = 'list-group-item list-group-item-action channel-item';
           channelItem.href = "#";
           channelItem.textContent = ch.name;
-          channelItem.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.querySelectorAll('.channel-item.active').forEach(el => el.classList.remove('active'));
-            this.classList.add('active');
-            const transformedUrl = transformUrl(ch.url);
-            playChannel(transformedUrl, ch.name);
-          });
+		  channelItem.addEventListener('click', function(e) {
+		    e.preventDefault();
+		    document.querySelectorAll('.channel-item.active').forEach(el => el.classList.remove('active'));
+		    this.classList.add('active');
+		    const transformedUrl = transformUrl(ch.url);
+		    // Kanal linkini input alanına yazıyoruz.
+		    document.getElementById("currentLink").value = transformedUrl;
+		    playChannel(transformedUrl, ch.name);
+		  });
+
           groupContent.appendChild(channelItem);
         });
         fragment.appendChild(groupContent);
@@ -806,72 +809,97 @@
     }
 
 	function playChannel(url, name = "") {
-	  const videoPlayer = document.getElementById('videoPlayer');
-	  document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
-	  document.getElementById("currentLink").value = url;
-	  
-	  if (url.endsWith('.mkv') || url.endsWith('.mp4')) {
-		videoPlayer.src = url;
-		videoPlayer.load();
-		videoPlayer.play();
-	  } else if (Hls.isSupported()) {
-		if (window.hls) {
-		  window.hls.destroy();
+		const videoPlayer = document.getElementById("videoPlayer");
+		document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
+
+		// Mevcut oynatmayı durdur
+		if (!videoPlayer.paused) {
+			videoPlayer.pause();
 		}
-		
-		const hls = new Hls({
-		  xhrSetup: function(xhr, url) {
-			// CORS ve güvenlik ayarlarını yapılandırma
-			xhr.withCredentials = false; // CORS isteği için önemli
-			// Debug için
-			console.log("HLS isteği yapılıyor:", url);
-		  },
-		  // Hata ayıklama ve yeniden deneme ayarları
-		  debug: true,
-		  manifestLoadingTimeOut: 15000,
-		  manifestLoadingMaxRetry: 5,
-		  levelLoadingTimeOut: 15000,
-		  levelLoadingMaxRetry: 5,
-		  fragLoadingTimeOut: 20000,
-		  fragLoadingMaxRetry: 5
-		});
-		
-		window.hls = hls;
-		hls.loadSource(url);
-		hls.attachMedia(videoPlayer);
-		hls.on(Hls.Events.MANIFEST_PARSED, function () {
-		  videoPlayer.play().catch(err => {
-			console.error("Oynatma hatası:", err);
-			showToast("Oynatma başlatılamadı: " + err.message, "error");
-		  });
-		});
-		
-		// Hata yakalama
-		hls.on(Hls.Events.ERROR, function (event, data) {
-		  console.error("HLS Hatası:", data);
-		  if (data.fatal) {
-			switch(data.type) {
-			  case Hls.ErrorTypes.NETWORK_ERROR:
-				console.log("Ağ hatası, yeniden deneniyor...");
-				hls.startLoad();
-				break;
-			  case Hls.ErrorTypes.MEDIA_ERROR:
-				console.log("Medya hatası, kurtarılmaya çalışılıyor...");
-				hls.recoverMediaError();
-				break;
-			  default:
-				console.error("Kurtarılamaz hata, yükleme durduruldu");
-				hls.destroy();
-				break;
+		videoPlayer.src = ""; // Kaynağı temizle
+
+		// Eğer Hls.js destekleniyorsa
+		if (Hls.isSupported()) {
+			if (window.hls) {
+				window.hls.destroy();
 			}
-		  }
-		});
-	  } else {
-		videoPlayer.src = url;
-		videoPlayer.load();
-		videoPlayer.play();
-	  }
+
+			// Hls.js yeni yapılandırma formatına uygun şekilde başlatıyoruz.
+			const hls = new Hls({
+				manifestLoadPolicy: {
+					default: {
+						maxTimeToFirstByteMs: 15000,
+						maxLoadTimeMs: 15000,
+						timeoutRetry: { maxNumRetry: 5, retryDelayMs: 0, maxRetryDelayMs: 0 },
+						errorRetry: { maxNumRetry: 5, retryDelayMs: 1000, maxRetryDelayMs: 8000 }
+					}
+				},
+				playlistLoadPolicy: {
+					default: {
+						maxTimeToFirstByteMs: 15000,
+						maxLoadTimeMs: 15000,
+						timeoutRetry: { maxNumRetry: 5, retryDelayMs: 0, maxRetryDelayMs: 0 },
+						errorRetry: { maxNumRetry: 5, retryDelayMs: 1000, maxRetryDelayMs: 8000 }
+					}
+				},
+				fragLoadPolicy: {
+					default: {
+						maxTimeToFirstByteMs: 20000,
+						maxLoadTimeMs: 20000,
+						timeoutRetry: { maxNumRetry: 5, retryDelayMs: 0, maxRetryDelayMs: 0 },
+						errorRetry: { maxNumRetry: 5, retryDelayMs: 1000, maxRetryDelayMs: 8000 }
+					}
+				},
+				lowLatencyMode: true,
+				enableWorker: true,
+				debug: true // Gelişmiş hata ayıklama için
+			});
+
+			window.hls = hls;
+			hls.loadSource(url);
+			hls.attachMedia(videoPlayer);
+
+			hls.on(Hls.Events.MANIFEST_PARSED, function () {
+				setTimeout(() => {
+					videoPlayer.play().catch(err => {
+						console.error("Oynatma hatası:", err);
+					});
+				}, 100); // Küçük bir gecikme ekleyerek çakışmayı önleyelim
+			});
+
+			// Hata yönetimi
+			hls.on(Hls.Events.ERROR, function (event, data) {
+				console.error("HLS Hatası:", data);
+				if (data.fatal) {
+					switch (data.type) {
+						case Hls.ErrorTypes.NETWORK_ERROR:
+							console.warn("Ağ hatası, yeniden deneniyor...");
+							hls.startLoad();
+							break;
+						case Hls.ErrorTypes.MEDIA_ERROR:
+							console.warn("Medya hatası, kurtarılmaya çalışılıyor...");
+							hls.recoverMediaError();
+							break;
+						default:
+							console.error("Ciddi hata, oynatma durduruldu.");
+							hls.destroy();
+							break;
+					}
+				}
+			});
+		} else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+			// Safari gibi HLS destekleyen tarayıcılar için
+			videoPlayer.src = url;
+			videoPlayer.play().catch(err => {
+				console.error("Oynatma hatası:", err);
+				alert("Video oynatılamadı: " + err.message);
+			});
+		} else {
+			console.error("HLS desteği bulunamadı.");
+			alert("Tarayıcınız HLS oynatmayı desteklemiyor.");
+		}
 	}
+
 
     function transformUrl(url) {
       try {
@@ -928,24 +956,127 @@
     }
 
 	function loadVavoo() {
-	  var vavooBtn = document.querySelector('.vavoo-btn');
-	  vavooBtn.style.background = "red";
-	  
-	  // Dinamik proxy URL oluşturma - GitHub Pages için uyumlu
-	  const corsProxyUrl = "https://burakkoz.burak-kozakbas.workers.dev/";
-	  const targetUrl = "https://rideordie.serv00.net/iptv/vavoo/tr.php";
-	  
-	  // User-Agent parametresi ekleyelim
+	  const targetUrl = "https://vavoo.to/channels";
 	  const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-	  const finalUrl = `${corsProxyUrl}?url=${encodeURIComponent(targetUrl)}&ua=${encodeURIComponent(userAgent)}`;
-	  
-	  var m3uUrlInput = document.getElementById('m3uUrl');
-	  m3uUrlInput.dataset.fullurl = finalUrl;
-	  m3uUrlInput.value = targetUrl;
-	  
-	  showToast("Vavoo yayınları yükleniyor...", "info");
-	  loadM3U();
+
+	  fetch(targetUrl, {
+		  headers: {
+			"User-Agent": userAgent
+		  }
+		})
+		.then(response => {
+		  if (!response.ok) {
+			throw new Error(`HTTP hata! Durum: ${response.status}`);
+		  }
+		  return response.text();
+		})
+		.then(data => {
+		  // Sadece "country":"Turkey" olan JSON nesnelerini regex ile ayıklıyoruz.
+		  const regex = /{[^}]*"country"\s*:\s*"Turkey"[^}]*}/g;
+		  const matches = data.match(regex);
+		  let channels = [];
+		  if (matches) {
+			matches.forEach(item => {
+			  try {
+				const obj = JSON.parse(item);
+				const channelUrl = `https://www.vavoo.to/play/${obj.id}/index.m3u8`;
+				let channelName = obj.name.toLocaleUpperCase('tr-TR');
+				let category = "";
+
+				// Sadece "BEIN SPORTS" ile başlayanları grup yap
+				if (channelName.trim().startsWith("BEIN SPORTS")) {
+				  category = "BEIN SPORTS";
+				} else if (channelName.trim().toLowerCase().startsWith("4k")) {
+				  category = "4K";
+				}
+
+				channels.push({
+				  name: channelName,
+				  id: obj.id,
+				  url: channelUrl,
+				  category: category
+				});
+			  } catch (e) {
+				console.error("JSON ayrıştırma hatası:", e);
+			  }
+			});
+		  } else {
+			console.warn("Turkey ülkesine ait kanal bulunamadı.");
+		  }
+		  renderChannelListModified(channels);
+		  showToast("Vavoo yayınları başarıyla yüklendi", "success");
+		})
+		.catch(error => {
+		  console.error("Vavoo yükleme hatası:", error);
+		  showToast("Vavoo yükleme hatası: " + error.message, "error");
+		});
 	}
+
+
+	// Kanalları gruplandıran render fonksiyonu
+	function renderChannelListModified(channels) {
+	  const channelListDiv = document.getElementById('channelList');
+	  channelListDiv.innerHTML = '';
+
+	  // Kanalları gruplara ayıralım:
+	  const beinSportsChannels = channels.filter(ch => ch.category === "BEIN SPORTS");
+	  const fourKChannels = channels.filter(ch => ch.category === "4K");
+	  const directChannels = channels.filter(ch => ch.category === "");
+
+	  // Yardımcı fonksiyon: grup oluştur ve kapalı başlat.
+	  function createGroup(groupName, groupChannels) {
+		if (groupChannels.length === 0) return;
+		const groupHeader = document.createElement('a');
+		groupHeader.className = 'list-group-item list-group-item-action group-header';
+		groupHeader.href = "#";
+		groupHeader.textContent = `${groupName} (${groupChannels.length})`;
+		groupHeader.addEventListener('click', function(e) {
+		  e.preventDefault();
+		  const contentDiv = this.nextElementSibling;
+		  contentDiv.style.display = (contentDiv.style.display === 'block') ? 'none' : 'block';
+		});
+		channelListDiv.appendChild(groupHeader);
+		const groupContent = document.createElement('div');
+		groupContent.className = 'group-content';
+		groupContent.style.display = 'none'; // kapalı başlat
+		groupChannels.forEach(ch => {
+		  const channelItem = document.createElement('a');
+		  channelItem.className = 'list-group-item list-group-item-action channel-item';
+		  channelItem.href = "#";
+		  channelItem.textContent = ch.name;
+		  channelItem.addEventListener('click', function(e) {
+		    e.preventDefault();
+		    const transformedUrl = transformUrl(ch.url);
+		    document.getElementById("currentLink").value = transformedUrl;
+		    playChannel(transformedUrl, ch.name);
+		  });
+		  groupContent.appendChild(channelItem);
+		});
+		channelListDiv.appendChild(groupContent);
+	  }
+
+	  // Önce BEIN SPORTS grubu (en başta)
+	  createGroup("BEIN SPORTS", beinSportsChannels);
+	  // Sonra 4K KANALLAR grubu
+	  createGroup("4K KANALLAR", fourKChannels);
+	  // Diğer kanalları direkt liste olarak ekliyoruz.
+	  directChannels.forEach(ch => {
+		const channelItem = document.createElement('a');
+		channelItem.className = 'list-group-item list-group-item-action channel-item';
+		channelItem.href = "#";
+		channelItem.textContent = ch.name;
+		channelItem.addEventListener('click', function(e) {
+		  e.preventDefault();
+		  const transformedUrl = transformUrl(ch.url);
+		  document.getElementById("currentLink").value = transformedUrl;
+		  playChannel(transformedUrl, ch.name);
+		});
+		channelListDiv.appendChild(channelItem);
+	  });
+	}
+
+
+
 
 	function loadM3U() {
 	  var m3uUrlInput = document.getElementById('m3uUrl');
