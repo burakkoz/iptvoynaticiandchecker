@@ -827,142 +827,144 @@
 	let currentChannelName = null;
 	let playbackMonitorInterval = null;
 	let errorCount = 0;
-	const maxErrorRetry = 5;
+	const maxErrorRetry = 3;
+
+	let retryCount = 0;
+	const maxRetries = 3;
+	let videoLoaded = false; // Bu değişken, video yüklendi mi kontrolü yapacak.
 
 	function playChannel(url, name = "") {
-	  const videoPlayer = document.getElementById("videoPlayer");
-	  document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
+		const videoPlayer = document.getElementById("videoPlayer");
+		document.getElementById("currentChannel").innerText = "Şu anda oynatılan kanal: " + (name || "Bilinmeyen Kanal");
 
-	  // **Seçili kanalı belirgin yap**
-	  highlightCurrentChannel(name);
+		// **Seçili kanalı belirgin yap**
+		highlightCurrentChannel(name);
 
-	  if (!videoPlayer.paused) {
-		videoPlayer.pause();
-	  }
-	  videoPlayer.src = "";
+		if (!videoPlayer.paused) {
+			videoPlayer.pause();
+		}
+		videoPlayer.src = "";
 
-	  if (window.hls) {
-		window.hls.destroy();
-	  }
+		if (window.hls) {
+			window.hls.destroy();
+		}
 
-	  currentChannelUrl = url;
-	  currentChannelName = name;
-	  errorCount = 0;
+		currentChannelUrl = url;
+		currentChannelName = name;
+		errorCount = 0;
 
-	  // **AVI ve MKV Dosyası Kontrolü (Doğrudan Oynat)**
-	  if (url.endsWith(".avi") || url.endsWith(".mkv")) {
-		console.log(`[INFO] ${url.split('.').pop().toUpperCase()} formatında video algılandı, oynatılıyor...`);
-		videoPlayer.src = url;
-		videoPlayer.load();
-		videoPlayer.play().catch(err => {
-		  console.error(`[ERROR] ${url.split('.').pop().toUpperCase()} oynatma hatası:`, err);
-		});
-		startPlaybackMonitor();
-		return;
-	  }
+		// Eğer video zaten yüklendiyse tekrar denemeye gerek yok.
+		if (videoLoaded) {
+			console.log("Video zaten yüklendi. Yeniden denemeye gerek yok.");
+			return;
+		}
 
-	  // **MP4 Dosyası Kontrolü (Doğrudan Oynat)**
-	  if (url.endsWith(".mp4")) {
-		console.log("[INFO] MP4 formatında video algılandı, doğrudan oynatılıyor...");
-		videoPlayer.src = url;
-		videoPlayer.load();
-		videoPlayer.play().catch(err => {
-		  console.error("[ERROR] MP4 oynatma hatası:", err);
-		});
-		startPlaybackMonitor();
-		return;
-	  }
+		// **MP4 Dosyası Kontrolü (Doğrudan Oynat)**
+		if (url.endsWith(".mp4")) {
+			console.log("[INFO] MP4 formatında video algılandı, doğrudan oynatılıyor...");
+			videoPlayer.src = url;
+			videoPlayer.load();
+			videoPlayer.play().catch(err => {
+				console.error("[ERROR] MP4 oynatma hatası:", err);
+				handleError(err);
+			});
+			startPlaybackMonitor();
+			return;
+		}
 
-	  // **M3U8 Formatı İçin HLS.js Kullanımı**
-	  if (Hls.isSupported()) {
-		const hls = new Hls({
-		  lowLatencyMode: false,
-		  maxBufferLength: 120,
-		  maxMaxBufferLength: 240,
-		  backBufferLength: 90,
-		  startPosition: -1
-		});
+		// **HLS.js (M3U8 Formatı İçin)**
+		if (Hls.isSupported()) {
+			const hls = new Hls({
+				lowLatencyMode: false,
+				maxBufferLength: 120,
+				maxMaxBufferLength: 240,
+				backBufferLength: 90,
+				startPosition: -1
+			});
 
-		window.hls = hls;
-		hls.loadSource(url);
-		hls.attachMedia(videoPlayer);
+			window.hls = hls;
+			hls.loadSource(url);
+			hls.attachMedia(videoPlayer);
 
-		hls.on(Hls.Events.MANIFEST_PARSED, function () {
-		  videoPlayer.play().catch(err => {
-			console.error("[ERROR] Oynatma hatası:", err);
-		  });
-		  startPlaybackMonitor();
-		});
+			hls.on(Hls.Events.MANIFEST_PARSED, function () {
+				videoPlayer.play().catch(err => {
+					console.error("[ERROR] Oynatma hatası:", err);
+					handleError(err);
+				});
+				startPlaybackMonitor();
+			});
 
-		hls.on(Hls.Events.ERROR, function (event, data) {
-		  console.error("[ERROR] HLS Hatası:", data);
-		  
-		  if (data.fatal) {
-			switch (data.type) {
-			  case Hls.ErrorTypes.NETWORK_ERROR:
-				console.warn("[WARN] Ağ hatası, yeniden deneniyor...");
-				hls.startLoad();
-				break;
-
-			  case Hls.ErrorTypes.MEDIA_ERROR:
-				console.warn("[WARN] Medya hatası tespit edildi. Düzeltme deneniyor...");
-				if (errorCount < maxErrorRetry) {
-				  errorCount++;
-				  hls.recoverMediaError();
-				} else {
-				  console.error("[ERROR] Çok fazla hata oluştu, kanal yeniden başlatılıyor.");
-				  restartCurrentChannel();
+			hls.on(Hls.Events.ERROR, function (event, data) {
+				console.error("[ERROR] HLS Hatası:", data);
+				if (data.fatal) {
+					handleHlsError(data);
 				}
-				break;
+			});
+		} else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
+			videoPlayer.src = url;
+			videoPlayer.play().catch(err => {
+				console.error("[ERROR] Oynatma hatası:", err);
+				handleError(err);
+			});
+			startPlaybackMonitor();
+		} else {
+			console.error("[ERROR] HLS desteği bulunamadı.");
+			handleError("HLS desteği bulunamadı.");
+		}
 
-			  case Hls.ErrorTypes.OTHER_ERROR:
-				console.warn("[WARN] OtherError! HLS.js sıfırdan başlatılıyor...");
-				restartCurrentChannel();
-				break;
-
-			  default:
-				console.error("[ERROR] Ciddi hata! Kanal yeniden başlatılıyor...");
-				restartCurrentChannel();
-				break;
-			}
-		  }
-		});
-
-	  } else if (videoPlayer.canPlayType('application/vnd.apple.mpegurl')) {
-		videoPlayer.src = url;
-		videoPlayer.play().catch(err => {
-		  console.error("[ERROR] Oynatma hatası:", err);
-		});
-		startPlaybackMonitor();
-	  } else {
-		console.error("[ERROR] HLS desteği bulunamadı.");
-	  }
-
-	  videoPlayer.onended = restartCurrentChannel;
-	  videoPlayer.onstalled = restartCurrentChannel;
-	  videoPlayer.onerror = restartCurrentChannel;
+		videoPlayer.onended = restartCurrentChannel;
+		videoPlayer.onstalled = restartCurrentChannel;
+		videoPlayer.onerror = restartCurrentChannel;
 	}
 
-	// **Kanalı Yeniden Başlat**
-	function restartCurrentChannel() {
-	  if (currentChannelUrl) {
-		console.warn("[WARN] Kanal durdu! Yeniden başlatılıyor...");
-		playChannel(currentChannelUrl, currentChannelName);
-	  }
+	function handleHlsError(data) {
+		if (retryCount < maxRetries) {
+			console.log(`Hata tespit edildi, ${retryCount + 1} kez yeniden denenecek.`);
+			retryCount++;
+			setTimeout(() => {
+				window.hls.startLoad();  // Kaynağı yeniden yüklemeyi deneyin
+			}, 7000); // 5 saniye bekle
+		} else {
+			console.error("Maksimum yeniden deneme sayısına ulaşıldı.");
+			showToast("Kanal yüklenemedi, lütfen tekrar deneyin.", "error");
+			videoLoaded = true; // Kanal yüklenemediğinde videoLoaded'i true yapalım.
+		}
+	}
+
+	function handleError(error) {
+		console.error("Oynatma hatası:", error);
+		showToast("Kanal oynatma hatası! Yeniden deneniyor...", "error");
+		if (retryCount < maxRetries) {
+			retryCount++;
+			setTimeout(() => {
+				playChannel(currentChannelUrl, currentChannelName);  // Yeniden oynatmayı dene
+			}, 7000);  // 5 saniye bekle
+		} else {
+			showToast("Kanal yüklenemedi, maksimum deneme sayısına ulaşıldı.", "error");
+			videoLoaded = true; // Hata durumunda videoLoaded'i true yapalım.
+		}
 	}
 
 	// **Şu an oynatılan kanalı vurgulama**
 	function highlightCurrentChannel(channelName) {
-	  localStorage.setItem("selectedChannel", channelName); // Kanalı kaydet
-	  const channelItems = document.querySelectorAll(".channel-item");
-	  channelItems.forEach(item => {
-		if (item.textContent === channelName) {
-		  item.classList.add("active-channel");
-		} else {
-		  item.classList.remove("active-channel");
-		}
-	  });
+		localStorage.setItem("selectedChannel", channelName); // Kanalı kaydet
+		const channelItems = document.querySelectorAll(".channel-item");
+		channelItems.forEach(item => {
+			if (item.textContent === channelName) {
+				item.classList.add("active-channel");
+			} else {
+				item.classList.remove("active-channel");
+			}
+		});
 	}
+
+	function restartCurrentChannel() {
+		if (currentChannelUrl) {
+			console.warn("[WARN] Kanal durdu! Yeniden başlatılıyor...");
+			playChannel(currentChannelUrl, currentChannelName);
+		}
+	}
+
 
 	// **Sayfa Yüklendiğinde Seçili Kanalı Geri Yükle**
 	document.addEventListener("DOMContentLoaded", function () {
@@ -982,7 +984,7 @@
 		if (!videoPlayer.paused) {
 		  if (videoPlayer.currentTime === lastTime) {
 			stallCounter++;
-			if (stallCounter >= 5) {
+			if (stallCounter >= 7) {
 			  console.warn("[WARN] Oynatma ilerlemesi durdu, kanal yeniden başlatılıyor...");
 			  clearInterval(playbackMonitorInterval);
 			  playbackMonitorInterval = null;
