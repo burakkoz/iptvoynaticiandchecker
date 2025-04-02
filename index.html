@@ -886,6 +886,9 @@
 			  contentDiv.style.maxHeight = '1000px'; // İçeriği rahatça sığdıracak kadar büyük yap
 			}, 10);
 		  }
+
+		  // Tüm kanallar hemen yükleniyor
+		  loadAllChannels(groupChannels, contentDiv);
 		});
 
 		fragment.appendChild(header);
@@ -897,68 +900,48 @@
 		groupContent.style.overflow = 'hidden';
 		groupContent.style.transition = 'max-height 0.3s ease-out';
 
-		// Lazy loading için başlangıçtaki görünür kanallar
-		let currentChannelIndex = 0;
-		const loadMoreChannels = () => {
-		  const channelsToShow = groupChannels.slice(currentChannelIndex, currentChannelIndex + 100); // İlk 50 kanal
-		  channelsToShow.forEach(ch => {
-			const channelItem = document.createElement('div');
-			channelItem.className = 'channel-item';
-
-			// Logo yerine boş bırakıyoruz
-			const logoHtml = ""; // No logo will be added
-
-			channelItem.innerHTML = `
-			  <div class="d-flex align-items-center">
-				${logoHtml}
-				<span>${ch.name}</span>
-			  </div>
-			`;
-
-			channelItem.addEventListener('click', function() {
-			  document.querySelectorAll('.channel-item.active').forEach(el => {
-				el.classList.remove('active');
-			  });
-
-			  this.classList.add('active');
-
-			  const transformedUrl = transformUrl(ch.url);
-			  document.getElementById("currentLink").value = transformedUrl;
-			  playChannel(transformedUrl, ch.name);
-			});
-
-			groupContent.appendChild(channelItem);
-		  });
-
-		  currentChannelIndex += 100; // 50 kanal yüklendi
-		}
-
-		// İlk yüklemeyi başlat
-		loadMoreChannels();
-
-		// Intersection Observer kullanarak scroll ile daha fazla kanal yükleme
-		const loadMoreObserver = new IntersectionObserver(entries => {
-		  entries.forEach(entry => {
-			if (entry.isIntersecting) {
-			  loadMoreChannels(); // Daha fazla kanal yükle
-			}
-		  });
-		}, { threshold: 1.0 });
-
-		// Yükleme için son öğeyi ekle
-		const lastItem = document.createElement('div');
-		lastItem.className = 'load-more';
-		lastItem.innerHTML = `<div style="text-align: center; padding: 10px;">Yükleniyor...</div>`;
-		groupContent.appendChild(lastItem);
-
-		// Observer'ı son öğeye ekleyelim
-		loadMoreObserver.observe(lastItem);
+		// Grup içeriğini başlangıçta boş bırakıyoruz, ama burada tüm kanalları yüklüyoruz
+		groupContent.appendChild(document.createElement('div')); // Placeholder element
 
 		fragment.appendChild(groupContent);
 	  }
 
 	  channelListDiv.appendChild(fragment);
 	}
+
+	// Tüm kanallar grup tıklaması ile yüklensin
+	function loadAllChannels(channels, groupContent) {
+	  channels.forEach(ch => {
+		const channelItem = document.createElement('div');
+		channelItem.className = 'channel-item';
+
+		// Logo yerine boş bırakıyoruz
+		const logoHtml = ""; // No logo will be added
+
+		channelItem.innerHTML = `
+		  <div class="d-flex align-items-center">
+			${logoHtml}
+			<span>${ch.name}</span>
+		  </div>
+		`;
+
+		// Kanal item'ına tıklama eventi ekliyoruz
+		channelItem.addEventListener('click', function() {
+		  document.querySelectorAll('.channel-item.active').forEach(el => {
+			el.classList.remove('active');
+		  });
+
+		  this.classList.add('active');
+
+		  // Video URL'yi dönüştür ve oynatıcıya ver
+		  const transformedUrl = transformUrl(ch.url);
+		  playChannel(transformedUrl, ch.name);
+		});
+
+		groupContent.appendChild(channelItem);
+	  });
+	}
+
 
 	// Video Player Module
 	let currentChannelUrl = null;
