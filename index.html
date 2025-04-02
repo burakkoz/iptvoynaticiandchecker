@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -915,6 +916,11 @@
 		videoPlayer.onended = restartCurrentChannel;
 		videoPlayer.onstalled = restartCurrentChannel;
 		videoPlayer.onerror = restartCurrentChannel;
+		// Add near the end of your playChannel function
+		videoPlayer.addEventListener('canplay', () => {
+		  console.log("[INFO] Video can play, playback starting");
+		  videoLoaded = true;
+		});
 	}
 
 	function handleHlsError(data) {
@@ -959,10 +965,25 @@
 	}
 
 	function restartCurrentChannel() {
-		if (currentChannelUrl) {
-			console.warn("[WARN] Kanal durdu! Yeniden başlatılıyor...");
-			playChannel(currentChannelUrl, currentChannelName);
+	  if (currentChannelUrl) {
+		console.warn("[WARN] Channel needs restart. Attempting to resume playback first...");
+		
+		const videoPlayer = document.getElementById("videoPlayer");
+		// Try to resume playback first before full restart
+		if (videoPlayer.readyState >= 3) {
+		  videoPlayer.play()
+			.then(() => {
+			  console.log("[INFO] Playback resumed successfully");
+			})
+			.catch(err => {
+			  console.error("[ERROR] Could not resume playback, performing full restart:", err);
+			  playChannel(currentChannelUrl, currentChannelName);
+			});
+		} else {
+		  // If video isn't ready, do a full restart
+		  playChannel(currentChannelUrl, currentChannelName);
 		}
+	  }
 	}
 
 
@@ -974,28 +995,54 @@
 	  }
 	});
 
-	// **Video Donduğunda veya Takıldığında Yeniden Başlatma**
+	// Replace the existing startPlaybackMonitor function with this improved version
 	function startPlaybackMonitor() {
 	  const videoPlayer = document.getElementById("videoPlayer");
 	  let lastTime = videoPlayer.currentTime;
 	  let stallCounter = 0;
+	  
+	  // Clear any existing interval first to prevent duplicates
+	  if (playbackMonitorInterval) {
+		clearInterval(playbackMonitorInterval);
+	  }
 
 	  playbackMonitorInterval = setInterval(() => {
-		if (!videoPlayer.paused) {
+		// Only check if video is playing and not actively buffering
+		if (!videoPlayer.paused && !videoPlayer.seeking && videoPlayer.readyState >= 3) {
 		  if (videoPlayer.currentTime === lastTime) {
 			stallCounter++;
-			if (stallCounter >= 10) {
-			  console.warn("[WARN] Oynatma ilerlemesi durdu, kanal yeniden başlatılıyor...");
+			console.log(`[MONITOR] Potential stall detected (${stallCounter}/15)`);
+			
+			// Increase stall threshold to 15 seconds (was 10)
+			if (stallCounter >= 15) {
+			  console.warn("[WARN] Playback stalled for 15 seconds, restarting channel...");
 			  clearInterval(playbackMonitorInterval);
 			  playbackMonitorInterval = null;
 			  restartCurrentChannel();
 			}
 		  } else {
+			// Reset counter when playback progresses
+			if (stallCounter > 0) {
+			  console.log("[MONITOR] Playback resumed normally");
+			}
 			stallCounter = 0;
 			lastTime = videoPlayer.currentTime;
 		  }
+		} else if (videoPlayer.readyState < 3 && !videoPlayer.paused) {
+		  // Video is buffering, don't count as stall
+		  console.log("[MONITOR] Video is buffering, not counting as stall");
 		}
 	  }, 1000);
+	}
+	
+	// Add this function to improve the error handling
+	function handleBuffering() {
+	  const videoPlayer = document.getElementById("videoPlayer");
+	  videoPlayer.addEventListener('waiting', () => {
+		console.log("[INFO] Video buffering...");
+		// Reset stall counter during buffering
+		stallCounter = 0;
+	  });
 	}
 
 	function loadK1() {
