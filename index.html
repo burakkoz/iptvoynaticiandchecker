@@ -237,18 +237,23 @@
 	  color: white;
 	}
 	.vavoo-btn {
-	  font-size: 1.2rem;
+	  font-size: 0.8rem;
 	  padding: 0.3rem 0.6rem;
 	  border-radius: 0.4rem;
 	}
 	.kanal-btn {
-	  font-size: 1.1rem;
+	  font-size: 0.8rem;
 	  padding: 0.3rem 0.6rem;
 	  border-radius: 0.4rem;
 	}
 	.channel-row:focus {
 	  outline: 2px solid var(--primary);
 	  background-color: rgba(99, 102, 241, 0.2);
+	}
+	.k-btn {
+	  font-size: 0.8rem;
+	  padding: 0.3rem 0.6rem;
+	  border-radius: 0.4rem;
 	}
   </style>
 </head>
@@ -285,6 +290,7 @@
 			id="m3uUrl" 
 			class="form-control input-field" 
 			value="https://raw.githubusercontent.com/GitLatte/patr0n/refs/heads/site/lists/iptvsevenler.m3u"
+		    placeholder="URL girin ve kanalları yükleyin"
 		  >
 		  <label class="btn gradient-btn" style="padding: 6px 12px;">
 			Dosya Seç
@@ -299,7 +305,9 @@
 		</div>
 		<div class="mb-3 d-flex align-items-center gap-2">
 		  <button class="btn gradient-btn kanal-btn" onclick="loadM3U()">Kanalları Yükle</button>
-		  <button class="btn gradient-btn vavoo-btn" onclick="loadVavoo()">Vavoo</button>
+		  <button class="btn gradient-btn vavoo-btn" onclick="loadVavoo()">V</button>
+	      <button class="btn gradient-btn k-btn" onclick="loadK1()">K1</button>
+		  <button class="btn gradient-btn k-btn" onclick="loadK2()">K2</button>
 		  <input type="text" id="channelSearch" class="form-control" style="max-width: 180px;" placeholder="Kanal Ara">
 		</div>
         <!-- Kanal listesi -->
@@ -747,15 +755,14 @@
       }
     });
 
-    // Debounce edilmiş kanal arama fonksiyonu
-    const debouncedChannelSearch = debounce(() => {
-      const query = document.getElementById("channelSearch").value.trim().toLowerCase();
-      const filtered = allChannels.filter(ch => ch.name.toLowerCase().includes(query));
-      // Arama durumunda tüm kanalları varsayılan gruplama ile listele
-      renderChannelListUnified(filtered);
-    }, 300);
+	// Debounce edilmiş kanal arama fonksiyonu
+	const debouncedChannelSearch = debounce(() => {
+	  const query = document.getElementById("channelSearch").value.trim().toLowerCase();
+	  const filtered = allChannels.filter(ch => ch.name.toLowerCase().includes(query));
+	  renderChannelListUnified(filtered); // Arama sonuçlarını listele
+	}, 300);
 
-    document.getElementById("channelSearch").addEventListener("input", debouncedChannelSearch);
+	document.getElementById("channelSearch").addEventListener("input", debouncedChannelSearch);
 
     /**
      * Tüm kanal listeleme fonksiyonlarını tek bir fonksiyonda birleştirdik.
@@ -989,13 +996,37 @@
 	  }, 1000);
 	}
 
+	function loadK1() {
+	  const url = "https://raw.githubusercontent.com/GitLatte/Sinetech/refs/heads/main/TvBahcesi/src/main/resources/m3u/tvbahcesi.m3u";
+	  fetch(url)
+		.then(response => response.text())
+		.then(data => {
+		  const channels = parseM3U(data); // Kanalları parse et
+		  const turkeyChannels = channels.filter(ch => ch.category === "Türkiye"); // Sadece Türkiye kanallarını al
+		  renderChannelListUnified(turkeyChannels); // Türkiye kanallarını listele
+		  showToast("Türkiye kanalları başarıyla yüklendi", "success");
+		})
+		.catch(error => {
+		  console.error("K1 yükleme hatası:", error);
+		  showToast("K1 yükleme hatası: " + error.message, "error");
+		});
+	}
 
 
-
-
-
-
-
+	function loadK2() {
+	  const url = "https://raw.githubusercontent.com/GitLatte/patr0n/refs/heads/site/lists/iptvsevenler.m3u";
+	  fetch(url)
+		.then(response => response.text())
+		.then(data => {
+		  const channels = parseM3U(data); // Tüm kanalları parse et
+		  renderChannelListUnified(channels); // Tüm kanalları listele
+		  showToast("K2 kanalları başarıyla yüklendi", "success");
+		})
+		.catch(error => {
+		  console.error("K2 yükleme hatası:", error);
+		  showToast("K2 yükleme hatası: " + error.message, "error");
+		});
+	}
 
     function transformUrl(url) {
       try {
@@ -1104,48 +1135,46 @@
         });
     }
 
-    function loadM3U() {
-      var m3uUrlInput = document.getElementById('m3uUrl');
-      var urlToFetch = m3uUrlInput.dataset.fullurl || m3uUrlInput.value.trim();
-      var fileInput = document.getElementById('m3uFile');
-      var file = fileInput.files[0];
-      
-      if (urlToFetch && !file) {
-        showToast("M3U dosyası yükleniyor...", "info");
-        fetch(urlToFetch)
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`HTTP hata! Durum: ${response.status}`);
-            }
-            return response.text();
-          })
-          .then(data => {
-            console.log("M3U verisi alındı, uzunluk:", data.length);
-            if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
-              throw new Error("Geçerli bir M3U dosyası değil!");
-            }
-            parseM3U(data);
-            showToast("M3U listesi başarıyla yüklendi", "success");
-          })
-          .catch(error => {
-            console.error("M3U yükleme hatası:", error);
-            showToast(`M3U yükleme hatası: ${error.message}`, "error");
-          });
-      } else if (file) {
-        var reader = new FileReader();
-        reader.onload = function(e) {
-          var data = e.target.result;
-          if (!data.includes('#EXTM3U') && !data.includes('#EXTINF:')) {
-            showToast("Geçerli bir M3U dosyası değil!", "error");
-            return;
-          }
-          parseM3U(data);
-        };
-        reader.readAsText(file);
-      } else {
-        showToast("Lütfen geçerli bir URL girin veya dosya seçin!", "error");
-      }
-    }
+	function loadM3U() {
+	  var m3uUrlInput = document.getElementById('m3uUrl');
+	  var urlToFetch = m3uUrlInput.value.trim();  // Take the input URL from the text field
+
+	  // Check if the URL ends with .ts or .m3u_plus and modify it accordingly
+	  if (urlToFetch) {
+		// Modify URL based on the type
+		if (urlToFetch.endsWith('.ts')) {
+		  // For .ts links, change output to hls
+		  urlToFetch = urlToFetch.replace(/\.ts$/, '.m3u8');  // Ensure the link ends with .m3u8
+		  urlToFetch = urlToFetch.replace('output=ts', 'output=hls');  // Change ts to hls in the URL
+		} else if (urlToFetch.endsWith('.m3u_plus')) {
+		  // For .m3u_plus links, modify the type to m3u&output=hls
+		  urlToFetch = urlToFetch.replace('.m3u_plus', '.m3u&output=hls');
+		}
+
+		showToast("M3U dosyası yükleniyor...", "info");
+
+		// Fetch the modified URL
+		fetch(urlToFetch)
+		  .then(response => response.text())
+		  .then(data => {
+			const channels = parseM3U(data);
+			if (channels && channels.length > 0) {
+			  renderChannelListUnified(channels);
+			  showToast("M3U listesi başarıyla yüklendi", "success");
+			} else {
+			  showToast("Geçerli kanallar bulunamadı!", "error");
+			}
+		  })
+		  .catch(error => {
+			console.error("M3U yükleme hatası:", error);
+			showToast("M3U yükleme hatası: " + error.message, "error");
+		  });
+	  } else {
+		showToast("Lütfen geçerli bir URL girin!", "error");
+	  }
+	}
+
+
 
     function addDebugPanel() {
       const debugPanel = document.createElement('div');
@@ -1221,59 +1250,40 @@
 
     document.addEventListener('DOMContentLoaded', addDebugPanel);
 
-    function parseM3U(data) {
-      const lines = data.split('\n').map(line => line.trim()).filter(line => line !== '');
-      const channels = [];
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.startsWith('#EXTINF:')) {
-          let category = "";
-          const groupMatch = line.match(/group-title="([^"]+)"/i);
-          if (groupMatch) category = groupMatch[1].trim();
-          let nameMatch = line.match(/tvg-name="([^"]+)"/i);
-          let name = nameMatch ? nameMatch[1].trim() : '';
-          if (!name) {
-            const parts = line.split(',');
-            name = parts.length > 1 ? parts[1].trim() : 'Bilinmeyen Kanal';
-          }
-          if (!name || name.match(/^[a-zA-Z0-9+\/=]{50,}$/)) name = 'Bilinmeyen Kanal';
-          if (!category) category = "Genel";
-          let j = i + 1;
-          while (j < lines.length && !lines[j].startsWith('http')) j++;
-          const channelUrl = lines[j] ? lines[j].trim() : '';
-          if (channelUrl) {
-            channels.push({ name, url: channelUrl, category });
-          }
-          i = j;
-        } else if (line.startsWith('http')) { 
-          const name = `Kanal ${channels.length + 1}`;
-          channels.push({ name, url: line, category: "Genel" });
-        }
-      }
-      allChannels = channels;
-      // Varsayılan gruplama ile listeleme yapıyoruz.
-      renderChannelListUnified(channels);
-    }
+	function parseM3U(data) {
+	  const lines = data.split('\n').map(line => line.trim()).filter(line => line !== '');
+	  const channels = [];
 
-    document.addEventListener('keydown', function(e) {
-      const focusableItems = Array.from(document.querySelectorAll('.channel-row'));
-      const currentIndex = focusableItems.indexOf(document.activeElement);
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        const prevIndex = currentIndex > 0 ? currentIndex - 1 : focusableItems.length - 1;
-        focusableItems[prevIndex].focus();
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        const nextIndex = currentIndex < focusableItems.length - 1 ? currentIndex + 1 : 0;
-        focusableItems[nextIndex].focus();
-      } else if (e.key === 'Enter') {
-        if (document.activeElement && document.activeElement.classList.contains('channel-row')) {
-          const channelUrl = document.activeElement.getAttribute('data-url');
-          const transformedUrl = transformUrl(channelUrl);
-          playChannel(transformedUrl, "Seçilen Kanal");
-        }
-      }
-    });
+	  for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		if (line.startsWith('#EXTINF:')) {
+		  let category = "";
+		  // group-title etiketini al ve kanal kategorisini belirle
+		  const groupMatch = line.match(/group-title="([^"]+)"/i);
+		  if (groupMatch) category = groupMatch[1].trim(); // Kategoriyi al
+
+		  let nameMatch = line.match(/tvg-name="([^"]+)"/i);
+		  let name = nameMatch ? nameMatch[1].trim() : '';
+		  if (!name) {
+			const parts = line.split(',');
+			name = parts.length > 1 ? parts[1].trim() : 'Bilinmeyen Kanal';
+		  }
+		  if (!category) category = "Genel";
+
+		  let j = i + 1;
+		  while (j < lines.length && !lines[j].startsWith('http')) j++;
+		  const channelUrl = lines[j] ? lines[j].trim() : '';
+
+		  if (channelUrl) {
+			channels.push({ name, url: channelUrl, category });
+		  }
+		  i = j;
+		}
+	  }
+	  allChannels = channels; // Burada allChannels dizisini dolduruyoruz
+	  renderChannelListUnified(channels); // Kanalları listele
+	  return channels; // Kanalları döndür
+	}
   </script>
 </body>
 </html>
