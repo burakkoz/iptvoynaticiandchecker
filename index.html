@@ -923,7 +923,7 @@
 			retryCount++;
 			setTimeout(() => {
 				window.hls.startLoad();  // Kaynağı yeniden yüklemeyi deneyin
-			}, 7000); // 5 saniye bekle
+			}, 10000); // 5 saniye bekle
 		} else {
 			console.error("Maksimum yeniden deneme sayısına ulaşıldı.");
 			showToast("Kanal yüklenemedi, lütfen tekrar deneyin.", "error");
@@ -938,7 +938,7 @@
 			retryCount++;
 			setTimeout(() => {
 				playChannel(currentChannelUrl, currentChannelName);  // Yeniden oynatmayı dene
-			}, 7000);  // 5 saniye bekle
+			}, 10000);  // 5 saniye bekle
 		} else {
 			showToast("Kanal yüklenemedi, maksimum deneme sayısına ulaşıldı.", "error");
 			videoLoaded = true; // Hata durumunda videoLoaded'i true yapalım.
@@ -984,7 +984,7 @@
 		if (!videoPlayer.paused) {
 		  if (videoPlayer.currentTime === lastTime) {
 			stallCounter++;
-			if (stallCounter >= 7) {
+			if (stallCounter >= 10) {
 			  console.warn("[WARN] Oynatma ilerlemesi durdu, kanal yeniden başlatılıyor...");
 			  clearInterval(playbackMonitorInterval);
 			  playbackMonitorInterval = null;
