@@ -1359,59 +1359,33 @@
 	  reader.readAsText(file);
 	});
 
-    function loadVavoo() {
-      const targetUrl = "https://vavoo.to/channels";
-      const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+	function loadVavoo() {
+	  // V butonu için, K2'de kullanılan M3U dosyasının URL'sini kullanıyoruz:
+	  const url = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/vavoo.m3u";
 
-      fetch(targetUrl, {
-          headers: {
-            "User-Agent": userAgent
-          }
-        })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP hata! Durum: ${response.status}`);
-          }
-          return response.text();
-        })
-        .then(data => {
-          const regex = /{[^}]*"country"\s*:\s*"Turkey"[^}]*}/g;
-          const matches = data.match(regex);
-          let channels = [];
-          if (matches) {
-            matches.forEach(item => {
-              try {
-                const obj = JSON.parse(item);
-                const channelUrl = `https://www.vavoo.to/play/${obj.id}/index.m3u8`;
-                let channelName = obj.name.toLocaleUpperCase('tr-TR');
-                let category = "";
-                if (channelName.trim().startsWith("BEIN SPORTS")) {
-                  category = "BEIN SPORTS";
-                } else if (channelName.trim().toLowerCase().startsWith("4k")) {
-                  category = "4K";
-                }
-                channels.push({
-                  name: channelName,
-                  id: obj.id,
-                  url: channelUrl,
-                  category: category
-                });
-              } catch (e) {
-                console.error("JSON ayrıştırma hatası:", e);
-              }
-            });
-          } else {
-            console.warn("Turkey ülkesine ait kanal bulunamadı.");
-          }
-          // Vavoo kanallarında özel gruplama yapmak için "vavoo" stratejisini kullanıyoruz.
-          renderChannelListUnified(channels, "vavoo");
-          showToast("Vavoo yayınları başarıyla yüklendi", "success");
-        })
-        .catch(error => {
-          console.error("Vavoo yükleme hatası:", error);
-          showToast("Vavoo yükleme hatası: " + error.message, "error");
-        });
-    }
+	  fetch(url)
+		.then(response => {
+		  if (!response.ok) {
+			throw new Error(`HTTP hata! Durum: ${response.status}`);
+		  }
+		  return response.text();
+		})
+		.then(data => {
+		  const channels = parseM3U(data);
+		  if (channels && channels.length > 0) {
+			// "vavoo" parametresi, listeleme için opsiyonel gruplama stratejisini belirtebilir.
+			renderChannelListUnified(channels, "vavoo");
+			showToast("Vavoo kanalları başarıyla yüklendi", "success");
+		  } else {
+			showToast("M3U dosyasında kanal bulunamadı.", "error");
+		  }
+		})
+		.catch(error => {
+		  console.error("Vavoo yükleme hatası:", error);
+		  showToast("Vavoo yükleme hatası: " + error.message, "error");
+		});
+	}
+
 
 	// URL yükleme fonksiyonu iyileştirmesi
 	async function loadM3U() {
