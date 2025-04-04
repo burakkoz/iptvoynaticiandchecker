@@ -1162,21 +1162,19 @@
 	  let stallCounter = 0;
 	  let bufferingCounter = 0;
 	  
-	  // Clear previous interval
+	  // Önceki interval'ı temizle
 	  if (playbackMonitorInterval) {
 		clearInterval(playbackMonitorInterval);
 	  }
 
 	  playbackMonitorInterval = setInterval(() => {
-		// Only check if video is playing and not actively buffering
 		if (!videoPlayer.paused) {
-		  // Check video loading status
 		  if (videoPlayer.readyState < 3) {
 			bufferingCounter++;
 			console.log(`[MONITOR] Video tamponlanıyor (${bufferingCounter}s)`);
 			
-			// Restart if buffering for too long
-			if (bufferingCounter > 30) {
+			// Tamponlama süresi 60 saniyeye çıkarıldı
+			if (bufferingCounter > 60) {
 			  console.warn("[WARN] Uzun tamponlama süresi, kanal yeniden başlatılıyor...");
 			  clearInterval(playbackMonitorInterval);
 			  playbackMonitorInterval = null;
@@ -1184,26 +1182,24 @@
 			  return;
 			}
 		  } else {
-			// Reset buffering counter
 			if (bufferingCounter > 0) {
 			  console.log("[MONITOR] Tamponlama bitti");
 			  bufferingCounter = 0;
 			}
 			
-			// Check for freezes
+			// Donma tespiti: 20 saniye beklemeden yeniden başlatma
 			if (videoPlayer.currentTime === lastTime) {
 			  stallCounter++;
-			  console.log(`[MONITOR] Olası donma tespit edildi (${stallCounter}/10)`);
+			  console.log(`[MONITOR] Olası donma tespit edildi (${stallCounter}/20)`);
 			  
-			  if (stallCounter >= 10) {
-				console.warn("[WARN] Oynatma 10 saniye boyunca dondu, kanal yeniden başlatılıyor...");
+			  if (stallCounter >= 20) {
+				console.warn("[WARN] Oynatma 20 saniye boyunca dondu, kanal yeniden başlatılıyor...");
 				clearInterval(playbackMonitorInterval);
 				playbackMonitorInterval = null;
 				restartCurrentChannel();
 				return;
 			  }
 			} else {
-			  // Reset counter if playback is progressing
 			  if (stallCounter > 0) {
 				console.log("[MONITOR] Oynatma normal şekilde devam ediyor");
 			  }
@@ -1214,6 +1210,7 @@
 		}
 	  }, 1000);
 	}
+
 
 	// Resource cleanup
 	function cleanupResources() {
