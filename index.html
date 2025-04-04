@@ -1416,9 +1416,9 @@
 	// URL yükleme fonksiyonu iyileştirmesi
 	async function loadM3U() {
 	  const m3uUrlInput = document.getElementById('m3uUrl');
-	  const urlToFetch = m3uUrlInput.value.trim();
+	  const url = m3uUrlInput.value.trim();
 
-	  if (!urlToFetch) {
+	  if (!url) {
 		showToast("Lütfen geçerli bir URL girin!", "error");
 		return;
 	  }
@@ -1426,30 +1426,27 @@
 	  showToast("M3U dosyası yükleniyor...", "info");
 
 	  try {
-		const response = await fetch(urlToFetch, {
-		  headers: {
-			'User-Agent': 'Mozilla/5.0'
-		  }
-		});
+		const response = await fetch(url);
 
 		if (!response.ok) {
 		  throw new Error(`HTTP hata! Durum: ${response.status}`);
 		}
 
-		const data = await response.text();
-		const channels = parseM3U(data);
+		const text = await response.text();
+		const channels = parseM3U(text);
 
 		if (channels && channels.length > 0) {
 		  renderChannelListUnified(channels);
 		  showToast(`${channels.length} kanal başarıyla yüklendi`, "success");
 		} else {
-		  showToast("Geçerli kanallar bulunamadı!", "error");
+		  showToast("M3U dosyasında kanal bulunamadı.", "error");
 		}
-	  } catch (error) {
-		console.error("M3U yükleme hatası:", error);
-		showToast("M3U yükleme hatası: " + error.message, "error");
+	  } catch (err) {
+		console.error("Yükleme hatası:", err);
+		showToast("Yükleme hatası: " + err.message, "error");
 	  }
 	}
+
 
 
 	document.getElementById('resetPlayerBtn').addEventListener('click', function() {
