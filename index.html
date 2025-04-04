@@ -1311,7 +1311,7 @@
 
 
 	function loadK2() {
-	  const url = "https://raw.githubusercontent.com/burakkoz/iptvoynaticiandchecker/refs/heads/main/brk.m3u";
+	  const url = "https://raw.githubusercontent.com/GitLatte/patr0n/refs/heads/site/lists/iptvsevenler.m3u";
 	  fetch(url)
 		.then(response => response.text())
 		.then(data => {
@@ -1417,70 +1417,28 @@
 	async function loadM3U() {
 	  const m3uUrlInput = document.getElementById('m3uUrl');
 	  const urlToFetch = m3uUrlInput.value.trim();
-	  
+
 	  if (!urlToFetch) {
 		showToast("Lütfen geçerli bir URL girin!", "error");
 		return;
 	  }
-	  
-	  // URL'yi analiz et ve düzenle
-	  let processedUrl = urlToFetch;
-	  
-	  try {
-		const url = new URL(processedUrl);
-		
-		// .ts uzantılı dosyaları .m3u8'e dönüştür
-		if (url.pathname.toLowerCase().endsWith('.ts')) {
-		  url.pathname = url.pathname.replace(/\.ts$/i, '.m3u8');
-		  
-		  // output parametresini güncelle
-		  const params = new URLSearchParams(url.search);
-		  if (params.has('output') && params.get('output') === 'ts') {
-			params.set('output', 'hls');
-			url.search = params.toString();
-		  }
-		  
-		  processedUrl = url.toString();
-		}
-		// .m3u_plus uzantılı dosyaları düzenle
-		else if (url.pathname.toLowerCase().endsWith('.m3u_plus')) {
-		  url.pathname = url.pathname.replace(/\.m3u_plus$/i, '.m3u');
-		  
-		  // output parametresini ekle
-		  const params = new URLSearchParams(url.search);
-		  params.set('output', 'hls');
-		  url.search = params.toString();
-		  
-		  processedUrl = url.toString();
-		}
-	  } catch (error) {
-		console.warn("[WARN] URL işlenirken hata oluştu:", error);
-		// URL analiz edilemezse orijinal URL ile devam et
-	  }
-	  
+
 	  showToast("M3U dosyası yükleniyor...", "info");
-	  
+
 	  try {
-		// Zaman aşımı ile fetch işlemi
-		const controller = new AbortController();
-		const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye zaman aşımı
-		
-		const response = await fetch(processedUrl, { 
-		  signal: controller.signal,
+		const response = await fetch(urlToFetch, {
 		  headers: {
-			'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+			'User-Agent': 'Mozilla/5.0'
 		  }
 		});
-		
-		clearTimeout(timeoutId);
-		
+
 		if (!response.ok) {
 		  throw new Error(`HTTP hata! Durum: ${response.status}`);
 		}
-		
+
 		const data = await response.text();
 		const channels = parseM3U(data);
-		
+
 		if (channels && channels.length > 0) {
 		  renderChannelListUnified(channels);
 		  showToast(`${channels.length} kanal başarıyla yüklendi`, "success");
@@ -1488,15 +1446,11 @@
 		  showToast("Geçerli kanallar bulunamadı!", "error");
 		}
 	  } catch (error) {
-		console.error("[ERROR] M3U yükleme hatası:", error);
-		
-		if (error.name === 'AbortError') {
-		  showToast("M3U yükleme zaman aşımına uğradı!", "error");
-		} else {
-		  showToast("M3U yükleme hatası: " + error.message, "error");
-		}
+		console.error("M3U yükleme hatası:", error);
+		showToast("M3U yükleme hatası: " + error.message, "error");
 	  }
 	}
+
 
 	document.getElementById('resetPlayerBtn').addEventListener('click', function() {
 	  const videoPlayer = document.getElementById("videoPlayer");
