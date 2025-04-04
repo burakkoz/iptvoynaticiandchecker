@@ -1308,7 +1308,7 @@
 		.then(response => response.text())
 		.then(data => {
 		  const channels = parseM3U(data); // Tüm kanalları parse et
-		  renderChannelListUnified(channels); // Tüm kanalları listele
+		  renderChannelListUnified(channels, "vavoo"); // Tüm kanalları listele
 		  showToast("Vavoo kanalları başarıyla yüklendi", "success");
 		})
 		.catch(error => {
