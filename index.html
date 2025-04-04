@@ -1416,17 +1416,43 @@
 	// URL yükleme fonksiyonu iyileştirmesi
 	async function loadM3U() {
 	  const m3uUrlInput = document.getElementById('m3uUrl');
-	  const url = m3uUrlInput.value.trim();
+	  let urlStr = m3uUrlInput.value.trim();
 
-	  if (!url) {
+	  if (!urlStr) {
 		showToast("Lütfen geçerli bir URL girin!", "error");
+		return;
+	  }
+
+	  // URL'yi düzenle
+	  try {
+		const urlObj = new URL(urlStr);
+		const params = urlObj.searchParams;
+
+		// Eğer output=ts ise output=hls yap
+		if (params.get("output") === "ts") {
+		  params.set("output", "hls");
+		}
+
+		// Eğer type=m3u_plus ise, type'ı m3u yap ve output=hls ekle
+		if (params.get("type") === "m3u_plus") {
+		  params.set("type", "m3u");
+		  params.set("output", "hls");
+		}
+		
+		// Güncellenmiş URL'yi al
+		urlStr = urlObj.toString();
+		// Güncellenmiş URL'yi inputa da yansıtmak istersen:
+		m3uUrlInput.value = urlStr;
+	  } catch (error) {
+		console.error("URL işleme hatası:", error);
+		showToast("URL işlenirken hata oluştu!", "error");
 		return;
 	  }
 
 	  showToast("M3U dosyası yükleniyor...", "info");
 
 	  try {
-		const response = await fetch(url);
+		const response = await fetch(urlStr);
 
 		if (!response.ok) {
 		  throw new Error(`HTTP hata! Durum: ${response.status}`);
@@ -1446,6 +1472,7 @@
 		showToast("Yükleme hatası: " + err.message, "error");
 	  }
 	}
+
 
 
 
