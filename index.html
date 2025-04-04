@@ -881,7 +881,9 @@
 		header.addEventListener('click', function() {
 		  const contentDiv = this.nextElementSibling; // Grup içeriği
 		  this.classList.toggle('open');  // Grup başlığını aç/kapa
+		  
 		  if (contentDiv.style.display === 'block') {
+			// Kapatma işlemi
 			contentDiv.style.maxHeight = contentDiv.scrollHeight + 'px';
 			setTimeout(() => {
 			  contentDiv.style.maxHeight = '0';
@@ -890,16 +892,18 @@
 			  }, 300);
 			}, 10);
 		  } else {
+			// Açma işlemi: Önce mevcut içeriği temizle
+			contentDiv.innerHTML = '';
 			contentDiv.style.display = 'block';
 			contentDiv.style.maxHeight = '0';
 			setTimeout(() => {
+			  // Kanalları yükle
+			  loadAllChannels(groupChannels, contentDiv);
 			  contentDiv.style.maxHeight = '1000px'; // İçeriği rahatça sığdıracak kadar büyük yap
 			}, 10);
 		  }
-
-		  // Tüm kanallar hemen yükleniyor
-		  loadAllChannels(groupChannels, contentDiv);
 		});
+
 
 		fragment.appendChild(header);
 
