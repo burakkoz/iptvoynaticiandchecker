@@ -327,7 +327,7 @@
       <!-- Sol: Video Oynatıcı -->
       <div class="col-md-8">
         <div class="video-player-section">
-          <video id="videoPlayer" controls playsinline webkit-playsinline style="width: 100%; max-height: 400px; background: black;">
+          <video id="videoPlayer" controls playsinline webkit-playsinline preload="auto" style="width: 100%; max-height: 400px; background: black;">
             Tarayıcınız video etiketini desteklemiyor.
           </video>
         </div>
@@ -1013,13 +1013,15 @@
 	  // HLS.js for M3U8 format
 	  if (Hls.isSupported()) {
 		const hls = new Hls({
-		  lowLatencyMode: false,
-		  maxBufferLength: 60,
-		  maxMaxBufferLength: 120,
-		  backBufferLength: 30,
-		  startPosition: -1,
-		  debug: false
+		  lowLatencyMode: true,          // Düşük gecikmeli mod, hızlı başlangıç sağlar.
+		  maxBufferLength: 30,           // Maksimum tampon süresini düşürün.
+		  maxMaxBufferLength: 30,        // Tampon süresinin en üst sınırını düşürün.
+		  backBufferLength: 10,          // Geriye dönük tampon süresini azaltın.
+		  startPosition: 0,              // Yayın başlangıcından hemen oynamaya başla.
+		  debug: false,
+		  autoStartLoad: true            // Kaynağın otomatik yüklenmesini sağlar.
 		});
+
 		
 		window.hls = hls;
 		hls.loadSource(url);
@@ -1214,13 +1216,10 @@
 
 	// Resource cleanup
 	function cleanupResources() {
-	  // Clear intervals
 	  if (playbackMonitorInterval) {
 		clearInterval(playbackMonitorInterval);
 		playbackMonitorInterval = null;
 	  }
-	  
-	  // Clean up HLS.js
 	  if (window.hls) {
 		try {
 		  window.hls.destroy();
@@ -1229,26 +1228,17 @@
 		}
 		window.hls = null;
 	  }
-	  
-	  // Reset video element
 	  const videoPlayer = document.getElementById("videoPlayer");
-	  
 	  try {
-		// Remove all event listeners
-		videoPlayer.onended = null;
-		videoPlayer.onstalled = null;
-		videoPlayer.onerror = null;
-		
-		// Clear video source
 		videoPlayer.pause();
 		videoPlayer.removeAttribute('src');
 		videoPlayer.load();
 	  } catch (e) {
 		console.error("[ERROR] Video oynatıcı temizlenirken hata:", e);
 	  }
-	  
 	  console.log("[INFO] Tüm kaynaklar başarıyla temizlendi");
 	}
+
 
 	// URL transformation helper
 	function transformUrl(url) {
@@ -1300,7 +1290,7 @@
 	}
 
 	function loadVavoo() {
-	  const url = "https://raw.githubusercontent.com/GitLatte/temporarylists/refs/heads/main/altsport/huhu.m3u";
+	  const url = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/vavoo.m3u";
 	  fetch(url)
 		.then(response => response.text())
 		.then(data => {
