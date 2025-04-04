@@ -1302,6 +1302,26 @@
 	  });
 	}
 
+	function loadVavoo() {
+	  const url = "https://joaquinito02.es/vavoo/index_Turkey.m3u";
+	  fetch(url)
+		.then(response => response.text())
+		.then(data => {
+		  const channels = parseM3U(data);
+		  if (channels && channels.length > 0) {
+			// Eğer vavoo kanallarını belirli grup mantığıyla ayırmak isterseniz, ikinci parametre "vavoo" geçebilirsiniz
+			renderChannelListUnified(channels, "vavoo");
+			showToast(`${channels.length} Vavoo kanalı başarıyla yüklendi`, "success");
+		  } else {
+			showToast("M3U dosyasında kanal bulunamadı.", "error");
+		  }
+		})
+		.catch(error => {
+		  console.error("Vavoo yükleme hatası:", error);
+		  showToast("Vavoo yükleme hatası: " + error.message, "error");
+		});
+	}
+
 	function loadK1() {
 	  const url = "https://raw.githubusercontent.com/GitLatte/Sinetech/refs/heads/main/TvBahcesi/src/main/resources/m3u/tvbahcesi.m3u";
 	  fetch(url)
@@ -1367,33 +1387,6 @@
 	  };
 	  reader.readAsText(file);
 	});
-
-	function loadVavoo() {
-	  const url = "https://joaquinito02.es/vavoo/index_Turkey.m3u";
-
-	  fetch(url)
-		.then(response => {
-		  if (!response.ok) {
-			throw new Error(`HTTP hata! Durum: ${response.status}`);
-		  }
-		  return response.text();
-		})
-		.then(data => {
-		  const channels = parseM3U(data);
-		  if (channels && channels.length > 0) {
-			renderChannelListUnified(channels, "vavoo");
-			showToast(`${channels.length} Vavoo kanalı başarıyla yüklendi`, "success");
-		  } else {
-			showToast("M3U dosyasında kanal bulunamadı.", "error");
-		  }
-		})
-		.catch(error => {
-		  console.error("Vavoo yükleme hatası:", error);
-		  showToast("Vavoo yükleme hatası: " + error.message, "error");
-		});
-	}
-
-
 
 	// URL yükleme fonksiyonu iyileştirmesi
 	async function loadM3U() {
