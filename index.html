@@ -1303,24 +1303,20 @@
 	}
 
 	function loadVavoo() {
-	  const url = "https://joaquinito02.es/vavoo/index_Turkey.m3u";
+	  const url = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/vavoo.m3u";
 	  fetch(url)
 		.then(response => response.text())
 		.then(data => {
-		  const channels = parseM3U(data);
-		  if (channels && channels.length > 0) {
-			// Eğer vavoo kanallarını belirli grup mantığıyla ayırmak isterseniz, ikinci parametre "vavoo" geçebilirsiniz
-			renderChannelListUnified(channels, "vavoo");
-			showToast(`${channels.length} Vavoo kanalı başarıyla yüklendi`, "success");
-		  } else {
-			showToast("M3U dosyasında kanal bulunamadı.", "error");
-		  }
+		  const channels = parseM3U(data); // Tüm kanalları parse et
+		  renderChannelListUnified(channels); // Tüm kanalları listele
+		  showToast("Vavoo kanalları başarıyla yüklendi", "success");
 		})
 		.catch(error => {
 		  console.error("Vavoo yükleme hatası:", error);
 		  showToast("Vavoo yükleme hatası: " + error.message, "error");
 		});
 	}
+
 
 	function loadK1() {
 	  const url = "https://raw.githubusercontent.com/GitLatte/Sinetech/refs/heads/main/TvBahcesi/src/main/resources/m3u/tvbahcesi.m3u";
