@@ -839,11 +839,20 @@
 	  let groups = {};
 
 	  // Gruplama stratejisini uygula
-	  if (strategy === "vavoo") {
-		groups["BEIN SPORTS"] = channels.filter(ch => ch.category === "BEIN SPORTS");
-		groups["4K KANALLAR"] = channels.filter(ch => ch.category === "4K");
-		groups["Diğer"] = channels.filter(ch => ch.category !== "BEIN SPORTS" && ch.category !== "4K");
-	  } else {
+		if (strategy === "vavoo") {
+		  groups["BEIN SPORTS"] = channels.filter(ch =>
+			ch.name.toLowerCase().includes("bein sports")
+		  );
+
+		  groups["4K KANALLAR"] = channels.filter(ch =>
+			ch.name.toLowerCase().includes("4k")
+		  );
+
+		  groups["Diğer"] = channels.filter(ch =>
+			!ch.name.toLowerCase().includes("bein sports") &&
+			!ch.name.toLowerCase().includes("4k")
+		  );
+		} else {
 		channels.forEach(ch => {
 		  const group = ch.category && ch.category.trim() ? ch.category : "Genel";
 		  if (!groups[group]) groups[group] = [];
@@ -1360,8 +1369,7 @@
 	});
 
 	function loadVavoo() {
-	  // V butonu için, K2'de kullanılan M3U dosyasının URL'sini kullanıyoruz:
-	  const url = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/vavoo.m3u";
+	  const url = "https://joaquinito02.es/vavoo/index_Turkey.m3u";
 
 	  fetch(url)
 		.then(response => {
@@ -1373,9 +1381,8 @@
 		.then(data => {
 		  const channels = parseM3U(data);
 		  if (channels && channels.length > 0) {
-			// "vavoo" parametresi, listeleme için opsiyonel gruplama stratejisini belirtebilir.
 			renderChannelListUnified(channels, "vavoo");
-			showToast("Vavoo kanalları başarıyla yüklendi", "success");
+			showToast(`${channels.length} Vavoo kanalı başarıyla yüklendi`, "success");
 		  } else {
 			showToast("M3U dosyasında kanal bulunamadı.", "error");
 		  }
@@ -1385,6 +1392,7 @@
 		  showToast("Vavoo yükleme hatası: " + error.message, "error");
 		});
 	}
+
 
 
 	// URL yükleme fonksiyonu iyileştirmesi
