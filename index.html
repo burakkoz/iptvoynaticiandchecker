@@ -257,9 +257,16 @@
         width: 100%;
         margin-bottom: 0.5rem;
       }
+	  .input-group {
+      flex-direction: column;
+	  }
+	  .o-btn, .d-btn {
+      width: 100%;
+      margin-bottom: 0.5rem;
+      }
       #startIndex {
         max-width: 100%;
-      }
+      }	 
     }
     @media (max-width: 576px) {
       .glass-panel {
@@ -273,6 +280,10 @@
         left: 50%;
         right: auto;
         transform: translateX(-50%);
+      }
+	  .o-btn, .d-btn {
+      padding: 0.75rem;
+      font-size: 1rem;
       }
     }
     .toast-container {
@@ -316,7 +327,6 @@
 	  padding: 0.1rem 0.4rem;
 	  border-radius: 0.5rem;
 	  width: 55px;
-	  object-fit: contain;
 	}
 	.d-btn {
 	  font-size: 0.8rem;
