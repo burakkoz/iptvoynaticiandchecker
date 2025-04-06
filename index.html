@@ -1327,12 +1327,14 @@
 
 
 	function loadK2() {
-	  const url = "https://www.dropbox.com/scl/fi/yiy1zu86te5rj5ngyzn24/myway.m3u.m3u?rlkey=h1z9rkhkz45b8tqc0pak2cvvj&st=t765rm9y&dl=1";
-	  fetch(url)
+	  const workerUrl = 'https://burakkoz.burak-kozakbas.workers.dev/';
+	  const targetUrl = "https://surl.be/myway06"; // Replace with the actual K2 URL
+
+	  fetch(workerUrl + '?url=' + encodeURIComponent(targetUrl))
 		.then(response => response.text())
 		.then(data => {
-		  const channels = parseM3U(data); // Tüm kanalları parse et
-		  renderChannelListUnified(channels); // Tüm kanalları listele
+		  const channels = parseM3U(data); // Parse M3U content
+		  renderChannelListUnified(channels); // Render channel list
 		  showToast("K2 kanalları başarıyla yüklendi", "success");
 		})
 		.catch(error => {
@@ -1340,6 +1342,7 @@
 		  showToast("K2 yükleme hatası: " + error.message, "error");
 		});
 	}
+
 
     document.getElementById("applyLinkBtn").addEventListener("click", function() {
       const editedUrl = document.getElementById("currentLink").value.trim();
