@@ -1391,67 +1391,87 @@
 	});
 
 	// URL yükleme fonksiyonu iyileştirmesi
+	// URL'yi kontrol eden fonksiyon
 	async function loadM3U() {
-	  const m3uUrlInput = document.getElementById('m3uUrl');
-	  let urlStr = m3uUrlInput.value.trim();
+		const m3uUrlInput = document.getElementById('m3uUrl');
+		let urlStr = m3uUrlInput.value.trim();
 
-	  if (!urlStr) {
-		showToast("Lütfen geçerli bir URL girin!", "error");
-		return;
-	  }
-
-	  // URL'yi düzenle
-	  try {
-		const urlObj = new URL(urlStr);
-		const params = urlObj.searchParams;
-
-		// Eğer output=ts ise output=hls yap
-		if (params.get("output") === "ts") {
-		  params.set("output", "hls");
+		if (!urlStr) {
+			showToast("Lütfen geçerli bir URL girin!", "error");
+			return;
 		}
 
-		// Eğer type=m3u_plus ise, type'ı m3u yap ve output=hls ekle
-		if (params.get("type") === "m3u_plus") {
-		  params.set("type", "m3u_plus");
-		  params.set("output", "hls");
+		// URL'yi düzenle
+		try {
+			const urlObj = new URL(urlStr);
+			const params = urlObj.searchParams;
+
+			// Eğer output=ts ise output=hls yap
+			if (params.get("output") === "ts") {
+				params.set("output", "hls");
+			}
+
+			// Eğer type=m3u_plus ise, type'ı m3u yap ve output=hls ekle
+			if (params.get("type") === "m3u_plus") {
+				params.set("type", "m3u_plus");
+				params.set("output", "hls");
+			}
+			
+			// Güncellenmiş URL'yi al
+			urlStr = urlObj.toString();
+			// Güncellenmiş URL'yi inputa da yansıtmak istersen:
+			m3uUrlInput.value = urlStr;
+		} catch (error) {
+			console.error("URL işleme hatası:", error);
+			showToast("URL işlenirken hata oluştu!", "error");
+			return;
 		}
-		
-		// Güncellenmiş URL'yi al
-		urlStr = urlObj.toString();
-		// Güncellenmiş URL'yi inputa da yansıtmak istersen:
-		m3uUrlInput.value = urlStr;
-	  } catch (error) {
-		console.error("URL işleme hatası:", error);
-		showToast("URL işlenirken hata oluştu!", "error");
-		return;
-	  }
 
-	  showToast("M3U dosyası yükleniyor...", "info");
+		// HLS linki ile denemeye başla
+		try {
+			const response = await fetch(urlStr);
 
-	  try {
-		const response = await fetch(urlStr);
+			if (!response.ok) {
+				throw new Error(`HTTP hata! Durum: ${response.status}`);
+			}
 
-		if (!response.ok) {
-		  throw new Error(`HTTP hata! Durum: ${response.status}`);
+			const text = await response.text();
+			const channels = parseM3U(text);
+
+			if (channels && channels.length > 0) {
+				renderChannelListUnified(channels);
+				showToast(`${channels.length} kanal başarıyla yüklendi`, "success");
+			} else {
+				showToast("M3U dosyasında kanal bulunamadı.", "error");
+			}
+		} catch (err) {
+			console.error("Yükleme hatası:", err);
+			showToast("Yükleme hatası: " + err.message, "error");
+
+			// Hata durumunda, orijinal link ile tekrar yükleme yap
+			const originalUrl = m3uUrlInput.value.replace("output=hls", ""); // HLS parametresini kaldır
+			try {
+				const originalResponse = await fetch(originalUrl);
+
+				if (!originalResponse.ok) {
+					throw new Error(`HTTP hata! Durum: ${originalResponse.status}`);
+				}
+
+				const originalText = await originalResponse.text();
+				const originalChannels = parseM3U(originalText);
+
+				if (originalChannels && originalChannels.length > 0) {
+					renderChannelListUnified(originalChannels);
+					showToast(`${originalChannels.length} kanal başarıyla yüklendi (orijinal link)`, "success");
+				} else {
+					showToast("M3U dosyasında kanal bulunamadı.", "error");
+				}
+			} catch (originalErr) {
+				console.error("Orijinal link yükleme hatası:", originalErr);
+				showToast("Orijinal link ile yükleme hatası: " + originalErr.message, "error");
+			}
 		}
-
-		const text = await response.text();
-		const channels = parseM3U(text);
-
-		if (channels && channels.length > 0) {
-		  renderChannelListUnified(channels);
-		  showToast(`${channels.length} kanal başarıyla yüklendi`, "success");
-		} else {
-		  showToast("M3U dosyasında kanal bulunamadı.", "error");
-		}
-	  } catch (err) {
-		console.error("Yükleme hatası:", err);
-		showToast("Yükleme hatası: " + err.message, "error");
-	  }
 	}
-
-
-
 
 	document.getElementById('resetPlayerBtn').addEventListener('click', function() {
 	  const videoPlayer = document.getElementById("videoPlayer");
