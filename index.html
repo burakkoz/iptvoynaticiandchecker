@@ -1401,11 +1401,6 @@
 	  }
 	});
 
-
-
-
-
-
     document.getElementById("applyLinkBtn").addEventListener("click", function() {
       const editedUrl = document.getElementById("currentLink").value.trim();
       if (editedUrl) {
@@ -1441,7 +1436,6 @@
 	});
 
 	// URL yükleme fonksiyonu iyileştirmesi
-	// URL'yi kontrol eden fonksiyon
 	async function loadM3U() {
 		const m3uUrlInput = document.getElementById('m3uUrl');
 		let urlStr = m3uUrlInput.value.trim();
@@ -1535,80 +1529,6 @@
 	  showToast("Oynatıcı sıfırlandı, tekrar kanal seçebilirsiniz", "success");
 	});
 	
-    function addDebugPanel() {
-      const debugPanel = document.createElement('div');
-      debugPanel.id = 'debugPanel';
-      debugPanel.style.cssText = `
-		position: fixed;
-		bottom: 0;
-		left: 0;
-		right: 0;
-		max-height: 200px;
-		overflow-y: auto;
-		background: rgba(0,0,0,0.8);
-		color: #00ff00;
-		font-family: monospace;
-		font-size: 12px;
-		z-index: 10000;
-		padding: 10px;
-		display: none;
-	  `;
-      
-      const toggleButton = document.createElement('button');
-      toggleButton.textContent = 'Debug';
-      toggleButton.style.cssText = `
-		position: fixed;
-		bottom: 10px;
-		right: 10px;
-		z-index: 10001;
-		padding: 5px 10px;
-		background: #333;
-		color: #fff;
-		border: none;
-		border-radius: 5px;
-	  `;
-      
-      toggleButton.addEventListener('click', () => {
-        const panel = document.getElementById('debugPanel');
-        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-      });
-      
-      document.body.appendChild(debugPanel);
-      document.body.appendChild(toggleButton);
-      
-      const originalConsoleLog = console.log;
-      const originalConsoleError = console.error;
-      const originalConsoleWarn = console.warn;
-      
-      console.log = function() {
-        originalConsoleLog.apply(console, arguments);
-        logToPanel('LOG', arguments);
-      };
-      
-      console.error = function() {
-        originalConsoleError.apply(console, arguments);
-        logToPanel('ERROR', arguments);
-      };
-      
-      console.warn = function() {
-        originalConsoleWarn.apply(console, arguments);
-        logToPanel('WARN', arguments);
-      };
-      
-      function logToPanel(type, args) {
-        const panel = document.getElementById('debugPanel');
-        const entry = document.createElement('div');
-        const timestamp = new Date().toISOString().substr(11, 8);
-        
-        entry.innerHTML = `<span style="color:${type === 'ERROR' ? 'red' : type === 'WARN' ? 'orange' : '#00ff00'}">[${timestamp}][${type}]</span> ${Array.from(args).map(arg => typeof arg === 'object' ? JSON.stringify(arg) : arg).join(' ')}`;
-        
-        panel.appendChild(entry);
-        panel.scrollTop = panel.scrollHeight;
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', addDebugPanel);
-
 	// M3U dosyasını ayrıştıran fonksiyon
 	function parseM3U(data) {
 	  if (!data || typeof data !== 'string') {
