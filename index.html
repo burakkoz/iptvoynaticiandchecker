@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -377,6 +378,7 @@
 		  <button class="btn gradient-btn vavoo-btn" onclick="loadVavoo()">V</button>
 	      <button class="btn gradient-btn k-btn" onclick="loadK1()">K1</button>
 		  <button class="btn gradient-btn k-btn" onclick="loadK2()">K2</button>
+		  <button class="btn gradient-btn k-btn" onclick="loadK3()">K3</button>
 		  <input type="text" id="channelSearch" class="form-control" style="max-width: 180px;" placeholder="Kanal Ara">
 		</div>
         <!-- Kanal listesi -->
@@ -1364,6 +1366,34 @@
 		  showToast("K2 yükleme hatası: " + error.message, "error");
 		});
 	}
+
+	function loadK3() {
+	  const url = "https://telegram.tabiptv.workers.dev/?action=get-m3u&source=tam";
+	  fetch(url)
+		.then(response => response.text())
+		.then(data => {
+		  const channels = parseM3U(data); // Kanalları ayrıştır
+		  // Filtreleme kaldırıldı, tüm kanalları listeliyoruz
+		  renderChannelListUnified(channels);
+		  showToast("Kanallar başarıyla yüklendi", "success");
+		})
+		.catch(error => {
+		  console.error("K3 yükleme hatası:", error);
+		  showToast("K3 yükleme hatası: " + error.message, "error");
+		});
+	}
+
+	function fixTurkishChars(text) {
+	  return text
+		.replace(/Ä±/g, "ı")
+		.replace(/ÅŸ/gi, "ş")
+		.replace(/Ã§/gi, "ç")
+		.replace(/Ã¼/gi, "ü")
+		.replace(/Ã¶/gi, "ö")
+		.replace(/Ä°/g, "İ")
+		.replace(/Ãœ/gi, "Ü")
+		.replace(/Ã–/gi, "Ö");
+	}
 	
 	// Add new functionality for fetching M3U links from the given URL and placing them in the textarea
 	document.getElementById("fetchLinksBtn").addEventListener("click", async function() {
@@ -1565,11 +1595,11 @@
 			// Kanal adını çıkar
 			const nameMatch = line.match(/tvg-name="([^"]+)"/i);
 			if (nameMatch) {
-			  name = nameMatch[1].trim();
+			  name = fixTurkishChars(nameMatch[1].trim());
 			} else {
 			  // tvg-name yoksa virgülden sonraki metni al
 			  const parts = line.split(',');
-			  if (parts.length > 1) name = parts[1].trim();
+			  if (parts.length > 1) name = fixTurkishChars(parts[1].trim());
 			}
 			
 			// URL'yi bul (sonraki satırlardan http ile başlayan ilk satır)
