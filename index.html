@@ -658,47 +658,49 @@
       }
     }
 
+
+	// --------------------------------------------------
+	// 1) Yeni processUrlsConcurrently (dinamik URL kuyruğu)
+	// --------------------------------------------------
 	async function processUrlsConcurrently() {
 	  const defaultConcurrency = 5;
-	  const concurrencyLimit = Math.min(navigator.hardwareConcurrency || defaultConcurrency, 10); // Limit concurrency to prevent overload
+	  const concurrencyLimit = Math.min(navigator.hardwareConcurrency || defaultConcurrency, 10);
 
+	  // Her işçi, scanningInProgress true olduğu sürece sıradaki URL'i alıp işlesin
 	  async function worker() {
-		while (currentIndex < totalUrls && scanningInProgress) {
-		  const url = urlList[currentIndex++];
-		  $('#indicator').text(`Tarama yapılıyor: ${url} (${currentIndex}/${totalUrls})`);
+		while (scanningInProgress) {
+		  const idx = currentIndex++;
+		  if (idx >= urlList.length) break;
+
+		  const url = urlList[idx];
+		  $('#indicator').text(`Tarama yapılıyor: ${url} (${idx + 1}/${urlList.length})`);
 		  await processUrlTask(url);
+
 		  completedCount++;
-		  $('#progressBar').css('width', `${(completedCount/totalUrls)*100}%`);
-		  $('#progressText').text(`${Math.round((completedCount/totalUrls)*100)}%`);
+		  const pct = Math.round((completedCount / urlList.length) * 100);
+		  $('#progressBar').css('width', `${pct}%`);
+		  $('#progressText').text(`${pct}%`);
 		}
 	  }
 
+	  // Tüm işçileri başlat ve bitişini bekle
 	  const workers = Array.from({ length: concurrencyLimit }, () => worker());
 	  await Promise.all(workers);
 	}
 
-
-	async function startScan() {
-	  // 1) Her zaman textarea’daki güncel linkleri al
-	  const content = $('#contenido').val() || "";
+	// ---------------------------------------
+	// 2) Yeni startScan (hemen başlatan)
+	// ---------------------------------------
+	function startScan() {
+	  // 1) Her seferinde textarea'dan güncel listeyi al
+	  const content = $('#contenido').val() || '';
 	  urlList = content.match(/(https?:\/\/[^\s]+)/g) || [];
 	  if (urlList.length === 0) {
 		showToast("Geçerli URL bulunamadı!", "error");
 		return;
 	  }
 
-	  // 2) Arka planda ekstra link çıkarma başlasın (scan’i bloklamasın)
-	  const extraPromise = extractExtraUrls(urlList)
-		.then(extraUrls => {
-		  const newOnes = extraUrls.filter(u => !urlList.includes(u));
-		  if (newOnes.length) {
-			urlList = urlList.concat(newOnes);
-			totalUrls = urlList.length;
-		  }
-		})
-		.catch(err => console.error("Ekstra URL hatası:", err));
-
-	  // 3) Scan için state’i sıfırla ve UI’ı hazırla
+	  // 2) İndex ve sayaçları resetle
 	  totalUrls = urlList.length;
 	  let startIdx = parseInt($('#startIndex').val(), 10);
 	  currentIndex = (!startIdx || startIdx < 1) ? 0 : startIdx - 1;
@@ -708,27 +710,34 @@
 	  }
 	  workingUrls   = [];
 	  completedCount = currentIndex;
-	  scanningInProgress = true;
 
-	  // Tabloyu temizle
+	  // 3) Tablo ve progress UI'ını hazırla
 	  if ($.fn.DataTable.isDataTable('#sortTable')) {
 		tableInstance.destroy();
 		tableInstance = null;
 	  }
 	  $('tbody').empty();
 	  $('#progressSection').removeClass('d-none');
+	  $('#indicator').text("Tarama Başladı");
+	  $('#progressText').text("0%");
+	  $('#progressBar').css('width', '0%');
 
-	  // 4) Tarama hemen başlasın
-	  processUrlsConcurrently();
-
-	  // 5) Ekstra URL’ler geldikçe devam et
-	  extraPromise.then(() => {
-		if (scanningInProgress) {
-		  processUrlsConcurrently();
-		}
-	  });
+	  // 4) Tarama flag'ini set et ve hemen başlat
+	  scanningInProgress = true;
+	  processUrlsConcurrently()
+		.then(() => {
+		  scanningInProgress = false;
+		  $('#indicator').text("Tarama Bitti");
+		  showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
+		  if (!$.fn.DataTable.isDataTable('#sortTable')) initDataTable();
+		  $('#downloadBtn').prop('disabled', workingUrls.length === 0);
+		  $('#toggleScanBtn').text("Durdur");
+		})
+		.catch(err => {
+		  console.error("Tarama sırasında hata:", err);
+		  showToast("Tarama işlemi sırasında hata oluştu!", "error");
+		});
 	}
-
 
 
 
