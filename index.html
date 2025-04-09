@@ -660,106 +660,122 @@
 
 	async function processUrlsConcurrently() {
 	  const defaultConcurrency = 5;
-	  const concurrencyLimit = Math.min(navigator.hardwareConcurrency || defaultConcurrency, 10); // Limit concurrency to prevent overload
+	  const concurrencyLimit = Math.min(navigator.hardwareConcurrency || defaultConcurrency, 10);
 
+	  // Her işçi, scanningInProgress true olduğu sürece sıradaki URL'i alıp işlesin
 	  async function worker() {
-		while (currentIndex < totalUrls && scanningInProgress) {
-		  const url = urlList[currentIndex++];
-		  $('#indicator').text(`Tarama yapılıyor: ${url} (${currentIndex}/${totalUrls})`);
+		while (scanningInProgress) {
+		  const idx = currentIndex++;
+		  if (idx >= urlList.length) break;
+
+		  const url = urlList[idx];
+		  $('#indicator').text(`Tarama yapılıyor: ${url} (${idx + 1}/${urlList.length})`);
 		  await processUrlTask(url);
+
 		  completedCount++;
-		  $('#progressBar').css('width', `${(completedCount/totalUrls)*100}%`);
-		  $('#progressText').text(`${Math.round((completedCount/totalUrls)*100)}%`);
+		  const pct = Math.round((completedCount / urlList.length) * 100);
+		  $('#progressBar').css('width', `${pct}%`);
+		  $('#progressText').text(`${pct}%`);
 		}
 	  }
 
+	  // Tüm işçileri başlat ve bitişini bekle
 	  const workers = Array.from({ length: concurrencyLimit }, () => worker());
 	  await Promise.all(workers);
 	}
 
-
 	async function startScan() {
-	  if (!initialized) {
-		const content = $('#contenido').val();
-		urlList = content.match(/(https?:\/\/[^\s]+)/g) || [];
-		if (urlList.length === 0) {
-		  showToast("Geçerli URL bulunamadı!", "error");
+	  const content = $('#contenido').val() || '';
+	  let urls = content.match(/(https?:\/\/[^\s]+)/g) || [];
+
+	  const defaultLink = 'https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/fullLink.txt';
+	  if (urls.length === 1 && urls[0] === defaultLink) {
+		try {
+		  const resp = await axios.get(defaultLink, { timeout: requestTimeout });
+		  const txt = resp.data;
+		  urls = txt.match(/(https?:\/\/[^\s]+)/g) || [];
+		} catch (err) {
+		  console.error("Default link çekme hatası:", err);
+		  showToast("Link listesini indirirken hata oluştu!", "error");
 		  return;
 		}
-		const extraUrls = await extractExtraUrls(urlList);
-		urlList = [...new Set(urlList.concat(extraUrls))];
-		totalUrls = urlList.length;
-		let startIdx = parseInt($('#startIndex').val());
-		if (isNaN(startIdx) || startIdx < 1) {
-		  currentIndex = 0;
-		} else {
-		  currentIndex = startIdx - 1;
-		  if (currentIndex >= totalUrls) {
-			showToast("Başlangıç indeksi URL sayısından fazla!", "error");
-			return;
-		  }
-		}
-		workingUrls = [];
-		completedCount = currentIndex; 
-		if ($.fn.DataTable.isDataTable('#sortTable')) {
-		  tableInstance.destroy();
-		  tableInstance = null;
-		}
-		$('tbody').empty();
-		$('#progressSection').removeClass('d-none');
-		initialized = true;
 	  }
-	  scanningInProgress = true;
 
-	  // Controlled concurrency with Promise.all
-	  await processUrlsConcurrently();
+	  if (urls.length === 0) {
+		showToast("Geçerli URL bulunamadı!", "error");
+		return;
+	  }
 
+	  // 🔄 Kalıcı olarak global urlList'e atıyoruz
+	  urlList = urls;
+	  totalUrls = urlList.length;
+
+	  let startIdx = parseInt($('#startIndex').val(), 10);
+	  currentIndex = (!startIdx || startIdx < 1) ? 0 : startIdx - 1;
 	  if (currentIndex >= totalUrls) {
+		showToast("Başlangıç indeksi URL sayısından fazla!", "error");
+		return;
+	  }
+
+	  workingUrls = [];
+	  completedCount = currentIndex;
+
+	  if ($.fn.DataTable.isDataTable('#sortTable')) {
+		tableInstance.destroy();
+		tableInstance = null;
+	  }
+	  $('tbody').empty();
+	  $('#progressSection').removeClass('d-none');
+	  $('#indicator').text("Tarama Başladı");
+	  $('#progressText').text("0%");
+	  $('#progressBar').css('width', '0%');
+
+	  scanningInProgress = true;
+	  processUrlsConcurrently()
+		.then(() => {
+		  checkCompletion();
+		})
+		.catch(err => {
+		  console.error("Tarama sırasında hata:", err);
+		  showToast("Tarama işlemi sırasında hata oluştu!", "error");
+		});
+	}
+
+	function toggleScan() {
+	  if (scanningInProgress) {
+		// Durdur
 		scanningInProgress = false;
-		$('#indicator').text("Tarama Bitti");
-		showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
+		cancelTokens.forEach(token => token.cancel());
+		cancelTokens = [];
+		$('#indicator').text("Tarama duraklatıldı");
+		$('#toggleScanBtn').text("Devam Ettir");
+		showToast("Tarama duraklatıldı.", "info");
+		$('#downloadBtn').prop('disabled', false);
 		if (!$.fn.DataTable.isDataTable('#sortTable')) {
 		  initDataTable();
 		}
-		$('#downloadBtn').prop('disabled', workingUrls.length === 0);
+	  } else {
+		// Devam ettir
+		if (!urlList || urlList.length === 0 || currentIndex >= urlList.length) {
+		  showToast("Tarama devam ettirilemez: Liste boş veya tamamlandı.", "info");
+		  return;
+		}
+
+		scanningInProgress = true;
 		$('#toggleScanBtn').text("Durdur");
+		$('#indicator').text(`Tarama devam ediyor: ${currentIndex + 1}/${totalUrls}`);
+		showToast("Tarama devam ediyor.", "info");
+
+		processUrlsConcurrently()
+		  .then(() => {
+			checkCompletion();
+		  })
+		  .catch(err => {
+			console.error("Devam ettirme sırasında hata:", err);
+			showToast("Tarama sırasında hata oluştu!", "error");
+		  });
 	  }
 	}
-
-
-    function toggleScan() {
-      if (scanningInProgress) {
-        scanningInProgress = false;
-        cancelTokens.forEach(token => token.cancel());
-        cancelTokens = [];
-        $('#toggleScanBtn').text("Devam Ettir");
-        showToast("Tarama duraklatıldı.", "info");
-        $('#downloadBtn').prop('disabled', false);
-        if (!$.fn.DataTable.isDataTable('#sortTable')) {
-          initDataTable();
-        }
-      } else {
-        if (currentIndex >= totalUrls) {
-          showToast("Tarama zaten tamamlandı.", "info");
-          return;
-        }
-        scanningInProgress = true;
-        $('#toggleScanBtn').text("Durdur");
-        showToast("Tarama devam ediyor.", "info");
-        processUrlsConcurrently().then(() => {
-          if (currentIndex >= totalUrls) {
-            scanningInProgress = false;
-            $('#indicator').text("Tarama Bitti");
-            showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
-            if (!$.fn.DataTable.isDataTable('#sortTable')) {
-              initDataTable();
-            }
-            $('#downloadBtn').prop('disabled', workingUrls.length === 0);
-            $('#toggleScanBtn').text("Durdur");
-          }
-        });
-      }
-    }
 
     function downloadTXT() {
       if (workingUrls.length === 0) {
@@ -777,28 +793,47 @@
       URL.revokeObjectURL(url);
     }
 
-    function remove() {
-      $('#contenido').val('');
-      $('tbody').empty();
-      $('#progressSection').addClass('d-none');
-      $('#downloadBtn').prop('disabled', true);
-      workingUrls = [];
-      if ($.fn.DataTable.isDataTable('#sortTable')) {
-        tableInstance.destroy();
-        tableInstance = null;
-      }
-      updateDownloadButton();
-      showToast('Tüm veriler temizlendi!', 'info');
-      scanningInProgress = false;
-      initialized = false;
-      currentIndex = 0;
-      totalUrls = 0;
-      completedCount = 0;
-      for (let key in responseCache) {
-        delete responseCache[key];
-      }
-      cancelTokens = [];
-    }
+	function remove() {
+	  // Textarea'yı default link ile sıfırla
+	  document.getElementById('contenido').value = 'https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/fullLink.txt';
+
+	  // DataTable varsa sil
+	  if ($.fn.DataTable.isDataTable('#sortTable')) {
+		tableInstance.destroy();
+		tableInstance = null;
+	  }
+
+	  // Tablo içeriğini temizle
+	  $('tbody').empty();
+
+	  // Progress bar'ı gizle
+	  $('#progressSection').addClass('d-none');
+
+	  // Diğer butonları sıfırla
+	  $('#downloadBtn').prop('disabled', true);
+	  $('#toggleScanBtn').text("Durdur");
+
+	  // Global değişkenleri temizle
+	  workingUrls = [];
+	  urlList = [];
+	  scanningInProgress = false;
+	  initialized = false;
+	  currentIndex = 0;
+	  totalUrls = 0;
+	  completedCount = 0;
+	  cancelTokens = [];
+
+	  for (let key in responseCache) {
+		delete responseCache[key];
+	  }
+
+	  // Link çekme durumunu sıfırla
+	  allFetchedLinks = [];
+	  fetchedOffset = 0;
+	  document.getElementById("fetchLinksBtn").innerHTML = `<i class="fas fa-link me-2"></i>Linkleri Çek`;
+
+	  showToast('Tüm veriler temizlendi!', 'info');
+	}
 
     $(document).on('click', '.copy-btn', function() {
       const link = $(this).attr('data-url');
@@ -927,7 +962,6 @@
 		  }
 		});
 
-
 		fragment.appendChild(header);
 
 		const groupContent = document.createElement('div');
@@ -978,7 +1012,6 @@
 		groupContent.appendChild(channelItem);
 	  });
 	}
-
 
 	// Video Player Module
 	let currentChannelUrl = null;
@@ -1114,7 +1147,6 @@
 	  });
 	}
 
-
 	// Error handling functions
 	function handleError(error, context = "genel") {
 	  console.error(`[${context}] Hata:`, error);
@@ -1240,7 +1272,6 @@
 	  }, 1000);
 	}
 
-
 	// Resource cleanup
 	function cleanupResources() {
 	  if (playbackMonitorInterval) {
@@ -1265,7 +1296,6 @@
 	  }
 	  console.log("[INFO] Tüm kaynaklar başarıyla temizlendi");
 	}
-
 
 	// URL transformation helper
 	function transformUrl(url) {
@@ -1331,7 +1361,6 @@
 		});
 	}
 
-
 	function loadK1() {
 	  const url = "https://raw.githubusercontent.com/GitLatte/Sinetech/refs/heads/main/TvBahcesi/src/main/resources/m3u/tvbahcesi.m3u";
 	  fetch(url)
@@ -1347,7 +1376,6 @@
 		  showToast("K1 yükleme hatası: " + error.message, "error");
 		});
 	}
-
 
 	function loadK2() {
 	  const workerUrl = 'https://burakkoz.burak-kozakbas.workers.dev/';
@@ -1393,42 +1421,71 @@
 		.replace(/Ãœ/gi, "Ü")
 		.replace(/Ã–/gi, "Ö");
 	}
-	
-	// Add new functionality for fetching M3U links from the given URL and placing them in the textarea
-	document.getElementById("fetchLinksBtn").addEventListener("click", async function() {
-	  const url = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/fullLink.txt"; // URL to fetch the links from
-	  
-	  try {
-		// Fetch the URL content
-		const response = await fetch(url);
-		
-		if (!response.ok) {
-		  throw new Error("HTTP error, status: " + response.status);
-		}
 
-		const text = await response.text(); // Get the text content of the file
-		const urlList = text.match(/(https?:\/\/[^\s]+)/g) || []; // Extract the URLs using a regex
-		
-		if (urlList.length === 0) {
-		  showToast("Hiçbir URL bulunamadı!", "error");
+	// Kaç linklik partiyle çekileceği ve durum takibi
+	let allFetchedLinks = [];
+	let fetchedOffset    = 0;
+	const fetchBatchSize = 500;
+	
+	document.getElementById("fetchLinksBtn").addEventListener("click", async function() {
+	  const btn = this;
+	  const defaultLink = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/fullLink.txt";
+	  
+	  // 1) İlk tıklamada tüm linkleri al
+	  if (allFetchedLinks.length === 0) {
+		try {
+		  const resp = await fetch(defaultLink);
+		  if (!resp.ok) throw new Error("HTTP " + resp.status);
+		  const txt = await resp.text();
+		  allFetchedLinks = txt.match(/(https?:\/\/[^\s]+)/g) || [];
+		  if (!allFetchedLinks.length) {
+			showToast("Hiçbir URL bulunamadı!", "error");
+			return;
+		  }
+		} catch (err) {
+		  console.error("Hata:", err);
+		  showToast("Bir hata oluştu, lütfen tekrar deneyin!", "error");
 		  return;
 		}
-
-		// Join the URLs into a single string separated by newlines
-		const urlText = urlList.join("\n");
-
-		// Set the content of the textarea with the fetched URLs
-		document.getElementById("contenido").value = urlText;
-
-		// Enable the "Kontrol Et" button once URLs are fetched
-		$('#downloadBtn').prop('disabled', false);
-		$('#toggleScanBtn').prop('disabled', false);
-
-	  } catch (error) {
-		console.error("Hata:", error);
-		showToast("Bir hata oluştu, lütfen tekrar deneyin!", "error");
 	  }
+
+	  // 2) Sıradaki 500’lük grubu al
+	  const nextBatch = allFetchedLinks.slice(fetchedOffset, fetchedOffset + fetchBatchSize);
+	  if (!nextBatch.length) {
+		showToast("Tüm linkler zaten çekildi!", "info");
+		return;
+	  }
+
+	  // 3) Textarea’ya ekle (defaultLink’i temizle)
+	  const ta  = document.getElementById("contenido");
+	  const cur = ta.value.trim();
+	  if (!cur || cur === defaultLink) {
+		ta.value = nextBatch.join("\n");
+	  } else {
+		ta.value = cur + "\n" + nextBatch.join("\n");
+	  }
+
+	  fetchedOffset += nextBatch.length;
+
+	  // 4) Butonda ilerlemeyi göster
+	  btn.innerHTML = `<i class="fas fa-link me-2"></i>Linkleri Çek (${fetchedOffset}/${allFetchedLinks.length})`;
+
+	  // 5) Diğer butonları aktifleştir
+	  $('#downloadBtn').prop('disabled', fetchedOffset === 0);
+	  $('#toggleScanBtn').prop('disabled', fetchedOffset === 0);
 	});
+	
+	function checkCompletion() {
+	  // completedCount >= urlList.length olduğunda doğal olarak bitti
+	  if (completedCount >= urlList.length) {
+	    scanningInProgress = false;
+	    $('#indicator').text("Tarama Bitti");
+	    showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
+	    if (!$.fn.DataTable.isDataTable('#sortTable')) initDataTable();
+	    $('#downloadBtn').prop('disabled', workingUrls.length === 0);
+	    $('#toggleScanBtn').text("Devam Ettir");
+	  }
+    }
 
     document.getElementById("applyLinkBtn").addEventListener("click", function() {
       const editedUrl = document.getElementById("currentLink").value.trim();
