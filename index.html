@@ -679,67 +679,56 @@
 
 
 	async function startScan() {
-	  if (!initialized) {
-		const content = $('#contenido').val();
-		urlList = content.match(/(https?:\/\/[^\s]+)/g) || [];
-		if (urlList.length === 0) {
-		  showToast("Geçerli URL bulunamadı!", "error");
-		  return;
-		}
-
-		// 1) Arka planda GitHub’daki/metindeki ekstra URL’leri çıkar
-		const extraPromise = extractExtraUrls(urlList);
-
-		// 2) İlk haliyle totalUrls’u ayarla ve UI’ı hazırla
-		totalUrls = urlList.length;
-		let startIdx = parseInt($('#startIndex').val());
-		if (isNaN(startIdx) || startIdx < 1) {
-		  currentIndex = 0;
-		} else {
-		  currentIndex = startIdx - 1;
-		  if (currentIndex >= totalUrls) {
-			showToast("Başlangıç indeksi URL sayısından fazla!", "error");
-			return;
-		  }
-		}
-		workingUrls = [];
-		completedCount = currentIndex;
-		if ($.fn.DataTable.isDataTable('#sortTable')) {
-		  tableInstance.destroy();
-		  tableInstance = null;
-		}
-		$('tbody').empty();
-		$('#progressSection').removeClass('d-none');
-		initialized = true;
-
-		// 3) Tarama hemen başlasın
-		scanningInProgress = true;
-		processUrlsConcurrently();
-
-		// 4) Ekstra URL’ler geldiğinde birleştir ve taramaya devam et
-		extraPromise.then(extraUrls => {
-		  const newUrls = extraUrls.filter(u => !urlList.includes(u));
-		  if (newUrls.length) {
-			urlList = urlList.concat(newUrls);
-			totalUrls = urlList.length;
-			// Kalan linkleri de işlemeye devam et
-			processUrlsConcurrently();
-		  }
-		}).catch(err => {
-		  console.error("Ekstra URL çıkarma hatası:", err);
-		});
-
+	  // 1) Her zaman textarea’daki güncel linkleri al
+	  const content = $('#contenido').val() || "";
+	  urlList = content.match(/(https?:\/\/[^\s]+)/g) || [];
+	  if (urlList.length === 0) {
+		showToast("Geçerli URL bulunamadı!", "error");
 		return;
 	  }
 
-	  // Eğer pause edilmişse resume et
-	  if (!scanningInProgress) {
-		scanningInProgress = true;
-		$('#toggleScanBtn').text("Durdur");
-		showToast("Tarama devam ediyor.", "info");
-		processUrlsConcurrently();
+	  // 2) Arka planda ekstra link çıkarma başlasın (scan’i bloklamasın)
+	  const extraPromise = extractExtraUrls(urlList)
+		.then(extraUrls => {
+		  const newOnes = extraUrls.filter(u => !urlList.includes(u));
+		  if (newOnes.length) {
+			urlList = urlList.concat(newOnes);
+			totalUrls = urlList.length;
+		  }
+		})
+		.catch(err => console.error("Ekstra URL hatası:", err));
+
+	  // 3) Scan için state’i sıfırla ve UI’ı hazırla
+	  totalUrls = urlList.length;
+	  let startIdx = parseInt($('#startIndex').val(), 10);
+	  currentIndex = (!startIdx || startIdx < 1) ? 0 : startIdx - 1;
+	  if (currentIndex >= totalUrls) {
+		showToast("Başlangıç indeksi URL sayısından fazla!", "error");
+		return;
 	  }
+	  workingUrls   = [];
+	  completedCount = currentIndex;
+	  scanningInProgress = true;
+
+	  // Tabloyu temizle
+	  if ($.fn.DataTable.isDataTable('#sortTable')) {
+		tableInstance.destroy();
+		tableInstance = null;
+	  }
+	  $('tbody').empty();
+	  $('#progressSection').removeClass('d-none');
+
+	  // 4) Tarama hemen başlasın
+	  processUrlsConcurrently();
+
+	  // 5) Ekstra URL’ler geldikçe devam et
+	  extraPromise.then(() => {
+		if (scanningInProgress) {
+		  processUrlsConcurrently();
+		}
+	  });
 	}
+
 
 
 
