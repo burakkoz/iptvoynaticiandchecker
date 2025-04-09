@@ -687,15 +687,11 @@
 		  return;
 		}
 
-		// Ekstra link çıkarma işlemini arka planda başlat
-		extractExtraUrls(urlList).then(extraUrls => {
-		  urlList = [...new Set(urlList.concat(extraUrls))];
-		  totalUrls = urlList.length;
-		});
+		// 1) Arka planda GitHub’daki/metindeki ekstra URL’leri çıkar
+		const extraPromise = extractExtraUrls(urlList);
 
-		// İlk totalUrls ayarı (arka plandaki güncelleme sonrası yeniden set edilecek)
+		// 2) İlk haliyle totalUrls’u ayarla ve UI’ı hazırla
 		totalUrls = urlList.length;
-
 		let startIdx = parseInt($('#startIndex').val());
 		if (isNaN(startIdx) || startIdx < 1) {
 		  currentIndex = 0;
@@ -706,7 +702,6 @@
 			return;
 		  }
 		}
-
 		workingUrls = [];
 		completedCount = currentIndex;
 		if ($.fn.DataTable.isDataTable('#sortTable')) {
@@ -716,25 +711,36 @@
 		$('tbody').empty();
 		$('#progressSection').removeClass('d-none');
 		initialized = true;
+
+		// 3) Tarama hemen başlasın
+		scanningInProgress = true;
+		processUrlsConcurrently();
+
+		// 4) Ekstra URL’ler geldiğinde birleştir ve taramaya devam et
+		extraPromise.then(extraUrls => {
+		  const newUrls = extraUrls.filter(u => !urlList.includes(u));
+		  if (newUrls.length) {
+			urlList = urlList.concat(newUrls);
+			totalUrls = urlList.length;
+			// Kalan linkleri de işlemeye devam et
+			processUrlsConcurrently();
+		  }
+		}).catch(err => {
+		  console.error("Ekstra URL çıkarma hatası:", err);
+		});
+
+		return;
 	  }
 
-	  scanningInProgress = true;
-
-	  // Tarama işlemini hemen başlat, await kullanma
-	  processUrlsConcurrently();
-
-	  // Eğer tarama bitti ise (örneğin çok hızlı olduysa), UI'ı güncelle
-	  if (currentIndex >= totalUrls) {
-		scanningInProgress = false;
-		$('#indicator').text("Tarama Bitti");
-		showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
-		if (!$.fn.DataTable.isDataTable('#sortTable')) {
-		  initDataTable();
-		}
-		$('#downloadBtn').prop('disabled', workingUrls.length === 0);
+	  // Eğer pause edilmişse resume et
+	  if (!scanningInProgress) {
+		scanningInProgress = true;
 		$('#toggleScanBtn').text("Durdur");
+		showToast("Tarama devam ediyor.", "info");
+		processUrlsConcurrently();
 	  }
 	}
+
 
 
 
