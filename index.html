@@ -626,62 +626,100 @@
       return results.flat();
     }
 
-    async function processUrlTask(url) {
-      try {
-        if(responseCache[url]){
-          const { info, categories } = responseCache[url];
-          renderRow(url, info, categories);
-          workingUrls.push(url);
-          updateDownloadButton();
-          return;
-        }
-        const { apiUrl, urlData } = processUrl(url);
-        const sourceInfo = axios.CancelToken.source();
-        cancelTokens.push(sourceInfo);
-        const [infoResponse, catResponse] = await Promise.all([
-          axios.get(`${apiUrl}?username=${urlData.username}&password=${urlData.password}`, { timeout: requestTimeout, cancelToken: sourceInfo.token }),
-          axios.get(`${apiUrl}?username=${urlData.username}&password=${urlData.password}&action=get_live_categories`, { timeout: requestTimeout, cancelToken: sourceInfo.token })
-        ]);
-        const info = infoResponse.data;
-        const categories = catResponse.data;
-        responseCache[url] = { info, categories };
-        renderRow(url, info, categories);
-        workingUrls.push(url);
-        updateDownloadButton();
-      } catch (error) {
-        if (axios.isCancel(error)) {
-          console.warn('İstek iptal edildi:', url);
-        } else {
-          console.error('Hata:', error.message);
-          showToast(`Hata: ${url} işlenemedi!`, 'error');
-        }
-      }
-    }
+	async function processUrlTask(url) {
+	  try {
+		// Eğer URL cache'de varsa, önceden işlenen veriyi kullan
+		if (responseCache[url]) {
+		  const { info, categories } = responseCache[url];
+		  renderRow(url, info, categories);
+		  workingUrls.push(url); // İşlenen URL'yi ekle
+		  updateDownloadButton();
+		  updateProgressBar();
+		  return;
+		}
+
+		// URL işleme için gerekli URL ve verileri oluştur
+		const { apiUrl, urlData } = processUrl(url);
+		const sourceInfo = axios.CancelToken.source();
+		cancelTokens.push(sourceInfo);
+
+		// Orijinal API URL'lerini oluşturuyoruz
+		const infoUrl = `${apiUrl}?username=${urlData.username}&password=${urlData.password}`;
+		const catUrl = `${apiUrl}?username=${urlData.username}&password=${urlData.password}&action=get_live_categories`;
+
+		// Proxy üzerinden istek yapmak için getProxyUrl fonksiyonunu kullanıyoruz.
+		const proxiedInfoUrl = getProxyUrl(infoUrl);
+		const proxiedCatUrl = getProxyUrl(catUrl);
+
+		const [infoResponse, catResponse] = await Promise.all([
+		  axios.get(proxiedInfoUrl, { timeout: requestTimeout, cancelToken: sourceInfo.token }),
+		  axios.get(proxiedCatUrl, { timeout: requestTimeout, cancelToken: sourceInfo.token })
+		]);
+
+		const info = infoResponse.data;
+		const categories = catResponse.data;
+
+		// Cevapları cache'le
+		responseCache[url] = { info, categories };
+
+		renderRow(url, info, categories);
+		workingUrls.push(url);
+		updateDownloadButton();
+
+		// İşlenen URL'yi takip et
+		updateProgressBar(); // Progres çubuğunu güncelle
+	  } catch (error) {
+		if (axios.isCancel(error)) {
+		  console.warn('İstek iptal edildi:', url);
+		} else {
+		  console.error('Hata:', error.message);
+		  showToast(`Hata: ${url} işlenemedi!`, 'error');
+		}
+	  }
+	}
+
+	// Global sayaçlar:
+	let processedCount = 0;
+
+	function getNextUrl() {
+	  if (currentIndex < urlList.length) {
+		return urlList[currentIndex++];
+	  }
+	  return null;
+	}
 
 	async function processUrlsConcurrently() {
 	  const defaultConcurrency = 5;
 	  const concurrencyLimit = Math.min(navigator.hardwareConcurrency || defaultConcurrency, 10);
 
-	  // Her işçi, scanningInProgress true olduğu sürece sıradaki URL'i alıp işlesin
 	  async function worker() {
-		while (scanningInProgress) {
-		  const idx = currentIndex++;
-		  if (idx >= urlList.length) break;
-
-		  const url = urlList[idx];
-		  $('#indicator').text(`Tarama yapılıyor: ${url} (${idx + 1}/${urlList.length})`);
+		let url;
+		while (scanningInProgress && (url = getNextUrl()) !== null) {
+		  const index = currentIndex; // NOT: currentIndex zaten getNextUrl()’te arttı.
+		  updateIndicator(url, index, urlList.length); // 👈 Aktif linki göster
 		  await processUrlTask(url);
-
-		  completedCount++;
-		  const pct = Math.round((completedCount / urlList.length) * 100);
-		  $('#progressBar').css('width', `${pct}%`);
-		  $('#progressText').text(`${pct}%`);
+		  updateIndicator(url, index + 1, urlList.length); // 👈 Güncelleme (ilerleme için)
 		}
 	  }
 
-	  // Tüm işçileri başlat ve bitişini bekle
 	  const workers = Array.from({ length: concurrencyLimit }, () => worker());
 	  await Promise.all(workers);
+	}
+
+	// updateIndicator fonksiyonunu global değişkenlerden yararlanacak şekilde güncelliyoruz.
+	function updateIndicator(currentUrl = (urlList[currentIndex] || ''), index = currentIndex, totalUrls = urlList.length) {
+	  // Eğer tarama devam etmiyorsa, duraklatılmış olarak göster:
+	  if (!scanningInProgress) {
+		$('#indicator').text(`Tarama duraklatıldı: ${currentUrl} (${index}/${totalUrls})`);
+	  }
+	  // Tüm URL’ler işlendiğinde:
+	  else if (index >= totalUrls) {
+		$('#indicator').text(`Tarama bitti`);
+	  }
+	  // Tarama devam ediyorsa:
+	  else {
+		$('#indicator').text(`Tarama yapılıyor: ${currentUrl} (${index}/${totalUrls})`);
+	  }
 	}
 
 	async function startScan() {
@@ -706,31 +744,32 @@
 		return;
 	  }
 
-	  // 🔄 Kalıcı olarak global urlList'e atıyoruz
+	  // Global urlList değişkenine atıyoruz
 	  urlList = urls;
 	  totalUrls = urlList.length;
 
-	  let startIdx = parseInt($('#startIndex').val(), 10);
-	  currentIndex = (!startIdx || startIdx < 1) ? 0 : startIdx - 1;
-	  if (currentIndex >= totalUrls) {
-		showToast("Başlangıç indeksi URL sayısından fazla!", "error");
-		return;
+	  // Kullanıcının belirlediği başlangıç indeksini oku (girdi değeri 500 ise 500. linkten başlamak için 499 indeks)
+	  const startIndexInput = parseInt($('#startIndex').val());
+	  if (startIndexInput && !isNaN(startIndexInput) && startIndexInput > 0 && startIndexInput <= urlList.length) {
+		currentIndex = startIndexInput - 1;
+	  } else {
+		currentIndex = 0;
 	  }
 
-	  workingUrls = [];
-	  completedCount = currentIndex;
-
+	  // Eğer DataTable varsa, onu yok et
 	  if ($.fn.DataTable.isDataTable('#sortTable')) {
 		tableInstance.destroy();
 		tableInstance = null;
 	  }
 	  $('tbody').empty();
 	  $('#progressSection').removeClass('d-none');
-	  $('#indicator').text("Tarama Başladı");
-	  $('#progressText').text("0%");
-	  $('#progressBar').css('width', '0%');
+
+	  // Tarama durumunu güncelle
+	  updateIndicator(); // Bu fonksiyon #indicator'ı güncelleyecek
 
 	  scanningInProgress = true;
+
+	  // URLs işlemi başlatılıyor
 	  processUrlsConcurrently()
 		.then(() => {
 		  checkCompletion();
@@ -743,19 +782,22 @@
 
 	function toggleScan() {
 	  if (scanningInProgress) {
-		// Durdur
+		// Tarama duraklatılıyor
 		scanningInProgress = false;
 		cancelTokens.forEach(token => token.cancel());
 		cancelTokens = [];
-		$('#indicator').text("Tarama duraklatıldı");
+
+		// Tarama duraklatıldı mesajını #indicator'da göster
+		updateIndicator(fetchedOffset); // Burada #indicator'ı güncelliyoruz
 		$('#toggleScanBtn').text("Devam Ettir");
 		showToast("Tarama duraklatıldı.", "info");
-		$('#downloadBtn').prop('disabled', false);
-		if (!$.fn.DataTable.isDataTable('#sortTable')) {
-		  initDataTable();
-		}
+
+		// İndir butonunu devre dışı bırak
+		$('#downloadBtn').prop('disabled', workingUrls.length === 0);
+		// Tarama butonunu devre dışı bırak
+		$('#toggleScanBtn').prop('disabled', currentIndex >= urlList.length);
 	  } else {
-		// Devam ettir
+		// Tarama devam ettiriliyor
 		if (!urlList || urlList.length === 0 || currentIndex >= urlList.length) {
 		  showToast("Tarama devam ettirilemez: Liste boş veya tamamlandı.", "info");
 		  return;
@@ -763,8 +805,15 @@
 
 		scanningInProgress = true;
 		$('#toggleScanBtn').text("Durdur");
-		$('#indicator').text(`Tarama devam ediyor: ${currentIndex + 1}/${totalUrls}`);
+
+		// Tarama devam ediyorsa, durumu güncelle
+		updateIndicator(fetchedOffset); // #indicator'ı günceller
 		showToast("Tarama devam ediyor.", "info");
+
+		// İndir butonunu devre dışı bırak
+		$('#downloadBtn').prop('disabled', workingUrls.length === 0);
+		// Tarama butonunu devre dışı bırak
+		$('#toggleScanBtn').prop('disabled', currentIndex >= urlList.length);
 
 		processUrlsConcurrently()
 		  .then(() => {
@@ -1074,10 +1123,10 @@
 	  if (Hls.isSupported()) {
 		const hls = new Hls({
 		  lowLatencyMode: true,          // Düşük gecikmeli mod, hızlı başlangıç sağlar.
+		  startPosition: 0,              // Yayın başlangıcından hemen oynamaya başla.
 		  maxBufferLength: 30,           // Maksimum tampon süresini düşürün.
 		  maxMaxBufferLength: 30,        // Tampon süresinin en üst sınırını düşürün.
 		  backBufferLength: 10,          // Geriye dönük tampon süresini azaltın.
-		  startPosition: 0,              // Yayın başlangıcından hemen oynamaya başla.
 		  debug: false,
 		  autoStartLoad: true            // Kaynağın otomatik yüklenmesini sağlar.
 		});
@@ -1348,7 +1397,9 @@
 
 	function loadVavoo() {
 	  const url = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/vavoo.m3u";
-	  fetch(url)
+	  // Orijinal URL yerine proxy URL üzerinden istek yapıyoruz.
+	  const proxyUrl = getProxyUrl(url);
+	  fetch(proxyUrl)
 		.then(response => response.text())
 		.then(data => {
 		  const channels = parseM3U(data); // Tüm kanalları parse et
@@ -1362,14 +1413,19 @@
 	}
 
 	function loadK1() {
-	  const url = "https://raw.githubusercontent.com/GitLatte/Sinetech/refs/heads/main/TvBahcesi/src/main/resources/m3u/tvbahcesi.m3u";
-	  fetch(url)
+	  // Gerçek K1 URL'sini belirleyin:
+	  const targetUrl = "https://raw.githubusercontent.com/DRAG-10/DRAG10/refs/heads/special/DRAG10.m3u"; // Gerçek K1 URL'nizi buraya yerleştirin.
+	  
+	  // Proxy URL'sini oluşturun:
+	  const proxyUrl = getProxyUrl(targetUrl);
+	  
+	  // Proxy üzerinden istek yapın:
+	  fetch(proxyUrl)
 		.then(response => response.text())
 		.then(data => {
-		  const channels = parseM3U(data); // Kanalları parse et
-		  const turkeyChannels = channels.filter(ch => ch.category === "Türkiye"); // Sadece Türkiye kanallarını al
-		  renderChannelListUnified(turkeyChannels); // Türkiye kanallarını listele
-		  showToast("Türkiye kanalları başarıyla yüklendi", "success");
+		  const channels = parseM3U(data); // M3U içeriğini ayrıştırın.
+		  renderChannelListUnified(channels); // Kanal listesini render edin.
+		  showToast("K1 kanalları başarıyla yüklendi", "success");
 		})
 		.catch(error => {
 		  console.error("K1 yükleme hatası:", error);
@@ -1378,14 +1434,18 @@
 	}
 
 	function loadK2() {
-	  const workerUrl = 'https://burakkoz.burak-kozakbas.workers.dev/';
-	  const targetUrl = "https://surl.be/myway06"; // Replace with the actual K2 URL
-
-	  fetch(workerUrl + '?url=' + encodeURIComponent(targetUrl))
+	  // Gerçek K2 URL'sini belirleyin:
+	  const targetUrl = "https://surl.be/myway06"; // Gerçek K2 URL'nizi buraya yerleştirin.
+	  
+	  // Proxy URL'sini oluşturun:
+	  const proxyUrl = getProxyUrl(targetUrl);
+	  
+	  // Proxy üzerinden istek yapın:
+	  fetch(proxyUrl)
 		.then(response => response.text())
 		.then(data => {
-		  const channels = parseM3U(data); // Parse M3U content
-		  renderChannelListUnified(channels); // Render channel list
+		  const channels = parseM3U(data); // M3U içeriğini ayrıştırın.
+		  renderChannelListUnified(channels); // Kanal listesini render edin.
 		  showToast("K2 kanalları başarıyla yüklendi", "success");
 		})
 		.catch(error => {
@@ -1396,11 +1456,13 @@
 
 	function loadK3() {
 	  const url = "https://telegram.tabiptv.workers.dev/?action=get-m3u&source=tam";
-	  fetch(url)
+	  const proxyUrl = getProxyUrl(url);
+	  
+	  fetch(proxyUrl)
 		.then(response => response.text())
 		.then(data => {
-		  const channels = parseM3U(data); // Kanalları ayrıştır
-		  // Filtreleme kaldırıldı, tüm kanalları listeliyoruz
+		  const channels = parseM3U(data); // M3U içeriğini ayrıştır
+		  // Tüm kanalları listele (filtreleme yapılmadan)
 		  renderChannelListUnified(channels);
 		  showToast("Kanallar başarıyla yüklendi", "success");
 		})
@@ -1424,18 +1486,21 @@
 
 	// Kaç linklik partiyle çekileceği ve durum takibi
 	let allFetchedLinks = [];
-	let fetchedOffset    = 0;
-	const fetchBatchSize = 500;
-	
+	let fetchedOffset = 0;  // Başlangıçta 0
+	const fetchBatchSize = 500; // Her seferinde 500 link çekiyoruz
+
 	document.getElementById("fetchLinksBtn").addEventListener("click", async function() {
 	  const btn = this;
 	  const defaultLink = "https://raw.githubusercontent.com/patr0nq/link/refs/heads/main/fullLink.txt";
 	  
-	  // 1) İlk tıklamada tüm linkleri al
 	  if (allFetchedLinks.length === 0) {
 		try {
-		  const resp = await fetch(defaultLink);
+		  // Proxy kullanarak defaultLink üzerinden isteği gerçekleştir
+		  const proxyDefaultLink = getProxyUrl(defaultLink);
+		  const resp = await fetch(proxyDefaultLink);
+		  
 		  if (!resp.ok) throw new Error("HTTP " + resp.status);
+		  
 		  const txt = await resp.text();
 		  allFetchedLinks = txt.match(/(https?:\/\/[^\s]+)/g) || [];
 		  if (!allFetchedLinks.length) {
@@ -1448,44 +1513,46 @@
 		  return;
 		}
 	  }
-
-	  // 2) Sıradaki 500’lük grubu al
+	  
+	  // Çekilen URL’lerden bir kısmını textarea'ya ekleyin
 	  const nextBatch = allFetchedLinks.slice(fetchedOffset, fetchedOffset + fetchBatchSize);
 	  if (!nextBatch.length) {
 		showToast("Tüm linkler zaten çekildi!", "info");
 		return;
 	  }
-
-	  // 3) Textarea’ya ekle (defaultLink’i temizle)
-	  const ta  = document.getElementById("contenido");
+	  
+	  const ta = document.getElementById("contenido");
 	  const cur = ta.value.trim();
 	  if (!cur || cur === defaultLink) {
 		ta.value = nextBatch.join("\n");
 	  } else {
 		ta.value = cur + "\n" + nextBatch.join("\n");
 	  }
-
+	  
 	  fetchedOffset += nextBatch.length;
-
-	  // 4) Butonda ilerlemeyi göster
+	  
+	  // Global urlList'ı textarea içeriğine göre güncelleyin
+	  urlList = ta.value.match(/(https?:\/\/[^\s]+)/g) || [];
+	  
 	  btn.innerHTML = `<i class="fas fa-link me-2"></i>Linkleri Çek (${fetchedOffset}/${allFetchedLinks.length})`;
-
-	  // 5) Diğer butonları aktifleştir
+	  
 	  $('#downloadBtn').prop('disabled', fetchedOffset === 0);
 	  $('#toggleScanBtn').prop('disabled', fetchedOffset === 0);
+	  
+	  updateIndicator();
 	});
-	
+
 	function checkCompletion() {
-	  // completedCount >= urlList.length olduğunda doğal olarak bitti
 	  if (completedCount >= urlList.length) {
-	    scanningInProgress = false;
-	    $('#indicator').text("Tarama Bitti");
-	    showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
-	    if (!$.fn.DataTable.isDataTable('#sortTable')) initDataTable();
-	    $('#downloadBtn').prop('disabled', workingUrls.length === 0);
-	    $('#toggleScanBtn').text("Devam Ettir");
+		scanningInProgress = false;
+		$('#indicator').text("Tarama Bitti");
+		showToast(`${workingUrls.length} aktif bağlantı bulundu!`, 'success');
+		if (!$.fn.DataTable.isDataTable('#sortTable')) initDataTable();
+		$('#downloadBtn').prop('disabled', workingUrls.length === 0);  // İndir butonunu güncelle
+		$('#toggleScanBtn').text("Devam Ettir");
+		$('#toggleScanBtn').prop('disabled', currentIndex >= urlList.length);  // Tarama butonunu devre dışı bırak
 	  }
-    }
+	}
 
     document.getElementById("applyLinkBtn").addEventListener("click", function() {
       const editedUrl = document.getElementById("currentLink").value.trim();
@@ -1520,87 +1587,138 @@
 	  };
 	  reader.readAsText(file);
 	});
+	
+	async function processUrlsInChunks() {
+		const chunkSize = 10; // Her seferinde 10 URL işlenecek
+		const chunks = [];
+
+		// URL'leri chunk'lara ayırma
+		for (let i = 0; i < urlList.length; i += chunkSize) {
+			chunks.push(urlList.slice(i, i + chunkSize));
+		}
+
+		// Her chunk'ı paralel olarak işle
+		for (const chunk of chunks) {
+			const promises = chunk.map(async (url) => {
+				await processUrlTask(url); // Her URL'yi işle
+			});
+			
+			// Tüm chunk işlemleri tamamlanana kadar bekleyin
+			await Promise.all(promises);
+			updateProgressBar(); // Progres çubuğunu güncelle
+		}
+
+		showToast('Veri taraması tamamlandı!', 'success');
+	}
+
+	function updateProgressBar() {
+		const pct = Math.round((completedCount / urlList.length) * 100);
+		$('#progressBar').css('width', `${pct}%`);
+		$('#progressText').text(`${pct}%`);
+	}
+
+	// Video oynatma işlemi bittiğinde zamanlayıcıyı temizle
+	function handleVideoStop() {
+		const videoPlayer = document.getElementById("videoPlayer");
+		if (videoPlayer.paused) {
+			// Zamanlayıcıyı temizle
+			clearInterval(playbackMonitorInterval);
+			playbackMonitorInterval = null;
+		}
+	}
+
+	// Video player 'onended' olayı ekleyelim
+	document.getElementById("videoPlayer").onended = handleVideoStop;
+
 
 	// URL yükleme fonksiyonu iyileştirmesi
+	// Proxy URL oluşturucu fonksiyon: Proxy dosyanızın yolunu düzenleyin.
+	function getProxyUrl(originalUrl) {
+	  // Proxy dosyanızın URL'si: burayı kendi sunucu yolunuza göre güncelleyin.
+	  return "http://burakkoz.rf.gd/proxy.php?url=" + encodeURIComponent(originalUrl);
+	}
+
 	async function loadM3U() {
-		const m3uUrlInput = document.getElementById('m3uUrl');
-		let urlStr = m3uUrlInput.value.trim();
+	  const m3uUrlInput = document.getElementById('m3uUrl');
+	  let urlStr = m3uUrlInput.value.trim();
 
-		if (!urlStr) {
-			showToast("Lütfen geçerli bir URL girin!", "error");
-			return;
+	  if (!urlStr) {
+		showToast("Lütfen geçerli bir URL girin!", "error");
+		return;
+	  }
+
+	  // URL'yi düzenle
+	  try {
+		const urlObj = new URL(urlStr);
+		const params = urlObj.searchParams;
+
+		// Eğer output=ts ise output=hls yap
+		if (params.get("output") === "ts") {
+		  params.set("output", "hls");
 		}
 
-		// URL'yi düzenle
+		// Eğer type=m3u_plus ise, type'ı m3u_plus yap ve output=hls ekle
+		if (params.get("type") === "m3u_plus") {
+		  params.set("type", "m3u_plus");
+		  params.set("output", "hls");
+		}
+		
+		// Güncellenmiş URL'yi al
+		urlStr = urlObj.toString();
+		// Güncellenmiş URL'yi inputa da yansıtmak istersen:
+		m3uUrlInput.value = urlStr;
+	  } catch (error) {
+		console.error("URL işleme hatası:", error);
+		showToast("URL işlenirken hata oluştu!", "error");
+		return;
+	  }
+
+	  // Proxy üzerinden HLS linki ile denemeye başla
+	  try {
+		const proxyUrl = getProxyUrl(urlStr);
+		const response = await fetch(proxyUrl);
+
+		if (!response.ok) {
+		  throw new Error(`HTTP hata! Durum: ${response.status}`);
+		}
+
+		const text = await response.text();
+		const channels = parseM3U(text);
+
+		if (channels && channels.length > 0) {
+		  renderChannelListUnified(channels);
+		  showToast(`${channels.length} kanal başarıyla yüklendi`, "success");
+		} else {
+		  showToast("M3U dosyasında kanal bulunamadı.", "error");
+		}
+	  } catch (err) {
+		console.error("Yükleme hatası:", err);
+		showToast("Yükleme hatası: " + err.message, "error");
+
+		// Hata durumunda, orijinal link ile (proxy'den geçmeyen) tekrar deneme yapabilirsiniz.
+		const originalUrl = m3uUrlInput.value.replace("output=hls", "");
 		try {
-			const urlObj = new URL(urlStr);
-			const params = urlObj.searchParams;
+		  // Eğer fallback olarak orijinal URL üzerinden de denemek isterseniz:
+		  const originalResponse = await fetch(originalUrl);
 
-			// Eğer output=ts ise output=hls yap
-			if (params.get("output") === "ts") {
-				params.set("output", "hls");
-			}
+		  if (!originalResponse.ok) {
+			throw new Error(`HTTP hata! Durum: ${originalResponse.status}`);
+		  }
 
-			// Eğer type=m3u_plus ise, type'ı m3u yap ve output=hls ekle
-			if (params.get("type") === "m3u_plus") {
-				params.set("type", "m3u_plus");
-				params.set("output", "hls");
-			}
-			
-			// Güncellenmiş URL'yi al
-			urlStr = urlObj.toString();
-			// Güncellenmiş URL'yi inputa da yansıtmak istersen:
-			m3uUrlInput.value = urlStr;
-		} catch (error) {
-			console.error("URL işleme hatası:", error);
-			showToast("URL işlenirken hata oluştu!", "error");
-			return;
+		  const originalText = await originalResponse.text();
+		  const originalChannels = parseM3U(originalText);
+
+		  if (originalChannels && originalChannels.length > 0) {
+			renderChannelListUnified(originalChannels);
+			showToast(`${originalChannels.length} kanal başarıyla yüklendi (orijinal link)`, "success");
+		  } else {
+			showToast("M3U dosyasında kanal bulunamadı.", "error");
+		  }
+		} catch (originalErr) {
+		  console.error("Orijinal link yükleme hatası:", originalErr);
+		  showToast("Orijinal link ile yükleme hatası: " + originalErr.message, "error");
 		}
-
-		// HLS linki ile denemeye başla
-		try {
-			const response = await fetch(urlStr);
-
-			if (!response.ok) {
-				throw new Error(`HTTP hata! Durum: ${response.status}`);
-			}
-
-			const text = await response.text();
-			const channels = parseM3U(text);
-
-			if (channels && channels.length > 0) {
-				renderChannelListUnified(channels);
-				showToast(`${channels.length} kanal başarıyla yüklendi`, "success");
-			} else {
-				showToast("M3U dosyasında kanal bulunamadı.", "error");
-			}
-		} catch (err) {
-			console.error("Yükleme hatası:", err);
-			showToast("Yükleme hatası: " + err.message, "error");
-
-			// Hata durumunda, orijinal link ile tekrar yükleme yap
-			const originalUrl = m3uUrlInput.value.replace("output=hls", ""); // HLS parametresini kaldır
-			try {
-				const originalResponse = await fetch(originalUrl);
-
-				if (!originalResponse.ok) {
-					throw new Error(`HTTP hata! Durum: ${originalResponse.status}`);
-				}
-
-				const originalText = await originalResponse.text();
-				const originalChannels = parseM3U(originalText);
-
-				if (originalChannels && originalChannels.length > 0) {
-					renderChannelListUnified(originalChannels);
-					showToast(`${originalChannels.length} kanal başarıyla yüklendi (orijinal link)`, "success");
-				} else {
-					showToast("M3U dosyasında kanal bulunamadı.", "error");
-				}
-			} catch (originalErr) {
-				console.error("Orijinal link yükleme hatası:", originalErr);
-				showToast("Orijinal link ile yükleme hatası: " + originalErr.message, "error");
-			}
-		}
+	  }
 	}
 
 	document.getElementById('resetPlayerBtn').addEventListener('click', function() {
